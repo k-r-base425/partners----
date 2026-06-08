@@ -1035,14 +1035,25 @@ function App() {
                       <div className="product-card-main">
                         <div className="product-summary">
                           <div className="product-meta-row">
-                            <span className="product-date">
-                              {isSold ? product.soldDate || '販売日未入力' : product.listingDate || '未出品'}
-                            </span>
-                            <span className={isSold ? 'product-badge sold' : 'product-badge'}>
-                              {isSold && product.marketplace
-                                ? getChannelLabel(product.marketplace)
-                                : product.status}
-                            </span>
+                            <div className="product-meta-info">
+                              <span className="product-date">
+                                {isSold
+                                  ? product.soldDate || '販売日未入力'
+                                  : product.listingDate || '未出品'}
+                              </span>
+                              <span className={isSold ? 'product-badge sold' : 'product-badge'}>
+                                {isSold && product.marketplace
+                                  ? getChannelLabel(product.marketplace)
+                                  : product.status}
+                              </span>
+                            </div>
+                            <button
+                              className="detail-toggle-button"
+                              type="button"
+                              onClick={() => toggleProductSection(product.id, 'detail')}
+                            >
+                              {isDetailExpanded ? '閉じる' : '詳細'}
+                            </button>
                           </div>
 
                           <h4 className="product-title">{product.name}</h4>
@@ -1087,14 +1098,6 @@ function App() {
                             )}
                           </div>
                         </div>
-
-                        <button
-                          className="detail-toggle-button"
-                          type="button"
-                          onClick={() => toggleProductSection(product.id, 'detail')}
-                        >
-                          {isDetailExpanded ? '閉じる' : '詳細'}
-                        </button>
                       </div>
 
                       {isDetailExpanded && (

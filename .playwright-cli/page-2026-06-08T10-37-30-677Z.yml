@@ -1,0 +1,66 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "販売委託管理アプリ" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 古着販売パートナー向け管理ツール
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: 現在の画面
+        - heading "ホーム" [level=2] [ref=e12]
+      - generic [ref=e13]:
+        - article [ref=e14]:
+          - paragraph [ref=e15]: 登録商品数
+          - strong [ref=e16]: "1"
+        - article [ref=e17]:
+          - paragraph [ref=e18]: 販売中
+          - strong [ref=e19]: "1"
+        - article [ref=e20]:
+          - paragraph [ref=e21]: 売却済み
+          - strong [ref=e22]: "0"
+        - article [ref=e23]:
+          - paragraph [ref=e24]: 請求待ち
+          - strong [ref=e25]: "0"
+        - article [ref=e26]:
+          - paragraph [ref=e27]: 請求済み
+          - strong [ref=e28]: "0"
+        - article [ref=e29]:
+          - paragraph [ref=e30]: 今月の販売額
+          - strong [ref=e31]: 0円
+        - article [ref=e32]:
+          - paragraph [ref=e33]: 今月の請求額
+          - strong [ref=e34]: 0円
+        - article [ref=e35]:
+          - paragraph [ref=e36]: 今月の利益
+          - strong [ref=e37]: 0円
+      - region "クイック操作" [ref=e38]:
+        - heading "クイック操作" [level=3] [ref=e39]
+        - generic [ref=e40]:
+          - button "利益を計算する 販売利益シミュレーションへ" [ref=e41] [cursor=pointer]:
+            - generic [ref=e42]: 利益を計算する
+            - generic [ref=e43]: 販売利益シミュレーションへ
+          - button "商品を登録する 商品登録・商品一覧へ" [ref=e44] [cursor=pointer]:
+            - generic [ref=e45]: 商品を登録する
+            - generic [ref=e46]: 商品登録・商品一覧へ
+          - button "請求を確認する 請求管理へ" [ref=e47] [cursor=pointer]:
+            - generic [ref=e48]: 請求を確認する
+            - generic [ref=e49]: 請求管理へ
+          - button "ルール・資料を見る 販売ルールとPDF資料の案内へ" [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: ルール・資料を見る
+            - generic [ref=e52]: 販売ルールとPDF資料の案内へ
+  - navigation "下部メニュー" [ref=e53]:
+    - button "ホーム" [ref=e54] [cursor=pointer]:
+      - generic [ref=e55]: 🏠
+      - generic [ref=e56]: ホーム
+    - button "計算" [ref=e57] [cursor=pointer]:
+      - generic [ref=e58]: 🧮
+      - generic [ref=e59]: 計算
+    - button "商品" [ref=e60] [cursor=pointer]:
+      - generic [ref=e61]: 👕
+      - generic [ref=e62]: 商品
+    - button "請求" [ref=e63] [cursor=pointer]:
+      - generic [ref=e64]: 💰
+      - generic [ref=e65]: 請求
+    - button "実績" [ref=e66] [cursor=pointer]:
+      - generic [ref=e67]: 📊
+      - generic [ref=e68]: 実績
