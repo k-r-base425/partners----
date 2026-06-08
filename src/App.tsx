@@ -186,6 +186,8 @@ const getProductCodeNumber = (code: string) => {
 const getTodayString = () => new Date().toISOString().slice(0, 10)
 const getChannelLabel = (channelId: SalesChannelId) =>
   salesChannels.find((channel) => channel.id === channelId)?.label ?? channelId
+const getProductThumbnail = (category: ProductCategory) =>
+  category === 'longSleeve' ? '🧥' : '👕'
 const getDefaultFeeRatePercent = (channelId: SalesChannelId) => {
   const channel = salesChannels.find((item) => item.id === channelId) ?? salesChannels[0]
   return String(channel.feeRate * 100)
@@ -604,6 +606,13 @@ function App() {
     setSaleForm(createSaleForm(product))
     setSaleError('')
     setSaleMessage('')
+    setExpandedSections((current) => ({
+      ...current,
+      [product.id]: {
+        ...current[product.id],
+        detail: true,
+      },
+    }))
   }
 
   const handleCancelSaleForm = () => {
@@ -1040,392 +1049,378 @@ function App() {
               <div className="product-card-list">
                 {filteredProducts.map((product) => {
                   const priceDropInfo = calculatePriceDropInfo(product)
-                  const isDiscountExpanded = isSectionExpanded(product.id, 'discount')
-                  const isSalesExpanded = isSectionExpanded(product.id, 'sales')
                   const isDetailExpanded = isSectionExpanded(product.id, 'detail')
-                  const isActionsExpanded = isSectionExpanded(product.id, 'actions')
+                  const isSold = product.soldPrice !== undefined
 
                   return (
                     <article className="product-card" key={product.id}>
-                      <div className="product-card-header">
-                        <div>
-                          <h4>{product.name}</h4>
-                          <p>{product.code || '商品番号なし'}</p>
+                      <div className="product-card-main">
+                        <div className="product-thumb" aria-hidden="true">
+                          <span>{getProductThumbnail(product.category)}</span>
                         </div>
-                        <span className="status-badge">{product.status}</span>
-                      </div>
 
-                      <dl className="product-detail-list">
-                        <div>
-                          <dt>商品種別 / サイズ</dt>
-                          <dd>
+                        <div className="product-summary">
+                          <div className="product-meta-row">
+                            <span className="product-date">
+                              {isSold ? product.soldDate || '販売日未入力' : product.listingDate || '未出品'}
+                            </span>
+                            <span className={isSold ? 'product-badge sold' : 'product-badge'}>
+                              {isSold && product.marketplace
+                                ? getChannelLabel(product.marketplace)
+                                : product.status}
+                            </span>
+                          </div>
+
+                          <h4 className="product-title">{product.name}</h4>
+                          <p className="product-code">{product.code || '商品番号なし'}</p>
+                          <p className="product-category-line">
                             {getCategoryLabel(product.category)} / {product.size}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>内部最低価格</dt>
-                          <dd>{formatYen(product.internalLowestPrice)}</dd>
-                        </div>
-                        <div>
-                          <dt>売りたい価格</dt>
-                          <dd>{formatYen(product.targetPrice)}</dd>
-                        </div>
-                      </dl>
+                          </p>
 
-                      {isDiscountExpanded && (
-                        <section className="price-drop-section" aria-label="値下げ運用">
-                          <div className="price-drop-heading">
-                            <h5>値下げ運用</h5>
-                            {priceDropInfo.hasInternalLowestPrice && (
-                              <span
-                                className={
-                                  priceDropInfo.isRelistRecommended
-                                    ? 'operation-badge relist'
-                                    : 'operation-badge'
-                                }
-                              >
-                                {priceDropInfo.operationStatus}
-                              </span>
+                          <div className="product-metrics">
+                            {isSold ? (
+                              <>
+                                <div className="metric-item">
+                                  <span>売価</span>
+                                  <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+                                </div>
+                                <div className="metric-item">
+                                  <span>利益</span>
+                                  <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
+                                </div>
+                                <div className="metric-item">
+                                  <span>利益率</span>
+                                  <strong>{formatPercent(product.profitRate ?? 0)}</strong>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="metric-item">
+                                  <span>内部最低</span>
+                                  <strong>{formatYen(product.internalLowestPrice)}</strong>
+                                </div>
+                                <div className="metric-item">
+                                  <span>売りたい</span>
+                                  <strong>{formatYen(product.targetPrice)}</strong>
+                                </div>
+                                <div className="metric-item">
+                                  <span>次回価格</span>
+                                  <strong>
+                                    {priceDropInfo.hasInternalLowestPrice
+                                      ? formatYen(priceDropInfo.nextDiscountPrice)
+                                      : '未計算'}
+                                  </strong>
+                                </div>
+                              </>
                             )}
                           </div>
+                        </div>
 
-                          {!priceDropInfo.hasInternalLowestPrice ? (
-                            <p className="price-drop-guidance">{priceDropInfo.guidance}</p>
-                          ) : (
-                            <>
-                              <dl className="price-drop-list">
-                                <div>
-                                  <dt>内部最低価格</dt>
-                                  <dd>{formatYen(product.internalLowestPrice)}</dd>
-                                </div>
-                                <div>
-                                  <dt>次回減額</dt>
-                                  <dd>{formatYen(priceDropInfo.nextDiscountAmount)}</dd>
-                                </div>
-                                <div>
-                                  <dt>次回値下げ後価格</dt>
-                                  <dd>{formatYen(priceDropInfo.nextDiscountPrice)}</dd>
-                                </div>
-                                <div>
-                                  <dt>売りたい価格</dt>
-                                  <dd>{formatYen(product.targetPrice)}</dd>
-                                </div>
-                                <div>
-                                  <dt>運用判定</dt>
-                                  <dd>{priceDropInfo.operationStatus}</dd>
-                                </div>
-                              </dl>
-                              <p className="price-drop-rounding">
-                                次回の減額額は50円単位で切り上げています
-                              </p>
-                              <p className="price-drop-frequency">割引頻度目安：2日に1回推奨</p>
-                              <p
-                                className={
-                                  priceDropInfo.isRelistRecommended
-                                    ? 'price-drop-return caution'
-                                    : 'price-drop-return'
-                                }
-                              >
-                                注意：{priceDropInfo.returnPriceMessage}
-                              </p>
-                            </>
-                          )}
-                        </section>
-                      )}
-
-                      {product.soldPrice !== undefined && (
-                        <dl className="sale-summary-list" aria-label="売却サマリー">
-                          <div>
-                            <dt>販売価格</dt>
-                            <dd>{formatYen(product.soldPrice)}</dd>
-                          </div>
-                          <div>
-                            <dt>請求額</dt>
-                            <dd>{formatYen(product.billingAmount ?? 0)}</dd>
-                          </div>
-                          <div>
-                            <dt>販売者利益</dt>
-                            <dd>{formatYen(product.sellerProfit ?? 0)}</dd>
-                          </div>
-                        </dl>
-                      )}
-
-                      {product.soldPrice !== undefined && isSalesExpanded && (
-                        <section className="sale-info-section" aria-label="販売情報">
-                          <h5>販売情報</h5>
-                          <dl className="sale-info-list">
-                            <div>
-                              <dt>販売日</dt>
-                              <dd>{product.soldDate || '未入力'}</dd>
-                            </div>
-                            <div>
-                              <dt>販売先</dt>
-                              <dd>
-                                {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt>販売価格</dt>
-                              <dd>{formatYen(product.soldPrice)}</dd>
-                            </div>
-                            <div>
-                              <dt>送料</dt>
-                              <dd>{formatYen(product.shippingFee ?? 0)}</dd>
-                            </div>
-                            <div>
-                              <dt>販売手数料率</dt>
-                              <dd>{formatFeeRate(product.feeRate ?? 0)}</dd>
-                            </div>
-                            <div>
-                              <dt>販売手数料</dt>
-                              <dd>{formatYen(product.platformFee ?? 0)}</dd>
-                            </div>
-                            <div>
-                              <dt>手数料後売価</dt>
-                              <dd>{formatYen(product.netSales ?? 0)}</dd>
-                            </div>
-                            <div>
-                              <dt>請求額</dt>
-                              <dd>{formatYen(product.billingAmount ?? 0)}</dd>
-                            </div>
-                            <div>
-                              <dt>販売者利益</dt>
-                              <dd>{formatYen(product.sellerProfit ?? 0)}</dd>
-                            </div>
-                            <div>
-                              <dt>利益率</dt>
-                              <dd>{formatPercent(product.profitRate ?? 0)}</dd>
-                            </div>
-                          </dl>
-                        </section>
-                      )}
-
-                      {activeSaleProductId === product.id && activeSaleResult && (
-                        <section className="sale-form-section" aria-label="売却登録フォーム">
-                          <h5>
-                            {product.soldPrice !== undefined ? '売却情報を編集' : '売却登録'}
-                          </h5>
-
-                          {saleError && <p className="form-message error">{saleError}</p>}
-                          {saleMessage && <p className="form-message success">{saleMessage}</p>}
-
-                          <label className="field-group">
-                            <span>販売日</span>
-                            <input
-                              type="date"
-                              value={saleForm.soldDate}
-                              onChange={(event) => updateSaleForm('soldDate', event.target.value)}
-                            />
-                          </label>
-
-                          <label className="field-group">
-                            <span>販売先</span>
-                            <select
-                              value={saleForm.marketplace}
-                              onChange={(event) =>
-                                handleSaleMarketplaceChange(event.target.value as SalesChannelId)
-                              }
-                            >
-                              {salesChannels.map((channel) => (
-                                <option key={channel.id} value={channel.id}>
-                                  {channel.label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <label className="field-group">
-                            <span>販売価格</span>
-                            <div className="input-with-unit">
-                              <input
-                                inputMode="numeric"
-                                min="0"
-                                pattern="[0-9]*"
-                                placeholder="例：10000"
-                                type="number"
-                                value={saleForm.soldPrice}
-                                onChange={(event) => updateSaleForm('soldPrice', event.target.value)}
-                              />
-                              <span>円</span>
-                            </div>
-                          </label>
-
-                          <label className="field-group">
-                            <span>送料</span>
-                            <div className="input-with-unit">
-                              <input
-                                inputMode="numeric"
-                                min="0"
-                                pattern="[0-9]*"
-                                type="number"
-                                value={saleForm.shippingFee}
-                                onChange={(event) =>
-                                  updateSaleForm('shippingFee', event.target.value)
-                                }
-                              />
-                              <span>円</span>
-                            </div>
-                          </label>
-
-                          <label className="field-group">
-                            <span>販売手数料率（％）</span>
-                            <div className="input-with-unit">
-                              <input
-                                inputMode="decimal"
-                                max="100"
-                                min="0"
-                                step="0.1"
-                                type="number"
-                                value={saleForm.feeRate}
-                                onChange={(event) => updateSaleForm('feeRate', event.target.value)}
-                              />
-                              <span>%</span>
-                            </div>
-                          </label>
-
-                          <div className="sale-result-highlight">
-                            <article>
-                              <span>最終請求額</span>
-                              <strong>{formatYen(activeSaleResult.finalCharge)}</strong>
-                            </article>
-                            <article>
-                              <span>販売者利益</span>
-                              <strong>{formatYen(activeSaleResult.sellerProfit)}</strong>
-                            </article>
-                          </div>
-
-                          <dl className="sale-calculation-list">
-                            <div>
-                              <dt>販売手数料</dt>
-                              <dd>{formatYen(activeSaleResult.salesFee)}</dd>
-                            </div>
-                            <div>
-                              <dt>手数料後売価</dt>
-                              <dd>{formatYen(activeSaleResult.priceAfterFee)}</dd>
-                            </div>
-                            <div>
-                              <dt>利益率</dt>
-                              <dd>{formatPercent(activeSaleResult.profitRate)}</dd>
-                            </div>
-                            <div>
-                              <dt>最低請求額</dt>
-                              <dd>
-                                {activeSaleResult.isMinimumChargeApplied
-                                  ? '最低請求額適用'
-                                  : '最低請求額適用なし'}
-                              </dd>
-                            </div>
-                          </dl>
-
-                          <div className="sale-form-actions">
-                            <button
-                              className="primary-submit-button"
-                              type="button"
-                              onClick={() => handleSaleSubmit(product)}
-                            >
-                              売却情報を登録する
-                            </button>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              onClick={handleCancelSaleForm}
-                            >
-                              キャンセル
-                            </button>
-                          </div>
-                        </section>
-                      )}
-
-                      {isDetailExpanded && (
-                        <section className="product-detail-section" aria-label="商品詳細">
-                          <h5>商品詳細</h5>
-                          <dl className="product-extra-detail-list">
-                            <div>
-                              <dt>商品種別</dt>
-                              <dd>{getCategoryLabel(product.category)}</dd>
-                            </div>
-                            <div>
-                              <dt>サイズ</dt>
-                              <dd>{product.size}</dd>
-                            </div>
-                            <div>
-                              <dt>出品開始価格</dt>
-                              <dd>{formatYen(product.startPrice)}</dd>
-                            </div>
-                            <div>
-                              <dt>出品日</dt>
-                              <dd>{product.listingDate || '未出品'}</dd>
-                            </div>
-                          </dl>
-                          {product.memo ? (
-                            <p className="product-memo">{product.memo}</p>
-                          ) : (
-                            <p className="product-memo empty">メモなし</p>
-                          )}
-                        </section>
-                      )}
-
-                      {isActionsExpanded && (
-                        <section className="product-operation-section" aria-label="操作">
-                          <h5>操作</h5>
-                          <div className="operation-actions">
-                            <button
-                              className="edit-product-button"
-                              type="button"
-                              onClick={() => handleEditProduct(product)}
-                            >
-                              商品情報を編集
-                            </button>
-                            <button
-                              className="delete-product-button"
-                              type="button"
-                              onClick={() => handleDeleteProduct(product.id)}
-                            >
-                              削除
-                            </button>
-                          </div>
-                        </section>
-                      )}
-
-                      <div className="product-card-actions">
                         <button
-                          className="sale-product-button"
-                          type="button"
-                          onClick={() => handleOpenSaleForm(product)}
-                        >
-                          {product.soldPrice !== undefined ? '売却情報を編集' : '販売登録'}
-                        </button>
-                        <button
-                          className="collapse-section-button"
-                          type="button"
-                          onClick={() => toggleProductSection(product.id, 'discount')}
-                        >
-                          {isDiscountExpanded ? '値下げ運用を閉じる' : '値下げ運用を開く'}
-                        </button>
-                        {product.soldPrice !== undefined && (
-                          <button
-                            className="collapse-section-button"
-                            type="button"
-                            onClick={() => toggleProductSection(product.id, 'sales')}
-                          >
-                            {isSalesExpanded ? '販売情報を閉じる' : '販売情報を開く'}
-                          </button>
-                        )}
-                        <button
-                          className="collapse-section-button"
+                          className="detail-toggle-button"
                           type="button"
                           onClick={() => toggleProductSection(product.id, 'detail')}
                         >
-                          {isDetailExpanded ? '商品詳細を閉じる' : '商品詳細を開く'}
-                        </button>
-                        <button
-                          className="collapse-section-button"
-                          type="button"
-                          onClick={() => toggleProductSection(product.id, 'actions')}
-                        >
-                          {isActionsExpanded ? '操作を閉じる' : '操作を開く'}
+                          {isDetailExpanded ? '閉じる' : '詳細'}
                         </button>
                       </div>
+
+                      {isDetailExpanded && (
+                        <div className="product-detail-panel">
+                          <section className="detail-panel-section" aria-label="商品詳細">
+                            <h5>商品詳細</h5>
+                            <div className="detail-grid">
+                              <div className="detail-box">
+                                <span>商品番号</span>
+                                <strong>{product.code || '商品番号なし'}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>商品種別</span>
+                                <strong>{getCategoryLabel(product.category)}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>サイズ</span>
+                                <strong>{product.size}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>出品開始価格</span>
+                                <strong>{formatYen(product.startPrice)}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>売りたい価格</span>
+                                <strong>{formatYen(product.targetPrice)}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>内部最低価格</span>
+                                <strong>{formatYen(product.internalLowestPrice)}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>出品日</span>
+                                <strong>{product.listingDate || '未出品'}</strong>
+                              </div>
+                              <div className="detail-box full">
+                                <span>メモ</span>
+                                <strong>{product.memo || 'メモなし'}</strong>
+                              </div>
+                            </div>
+                          </section>
+
+                          <section className="detail-panel-section" aria-label="値下げ運用">
+                            <h5>値下げ運用</h5>
+                            {!priceDropInfo.hasInternalLowestPrice ? (
+                              <p className="price-drop-guidance">{priceDropInfo.guidance}</p>
+                            ) : (
+                              <>
+                                <div className="detail-grid">
+                                  <div className="detail-box">
+                                    <span>次回減額</span>
+                                    <strong>{formatYen(priceDropInfo.nextDiscountAmount)}</strong>
+                                  </div>
+                                  <div className="detail-box">
+                                    <span>次回値下げ後価格</span>
+                                    <strong>{formatYen(priceDropInfo.nextDiscountPrice)}</strong>
+                                  </div>
+                                  <div className="detail-box">
+                                    <span>運用判定</span>
+                                    <strong>{priceDropInfo.operationStatus}</strong>
+                                  </div>
+                                  <div className="detail-box">
+                                    <span>割引頻度目安</span>
+                                    <strong>2日に1回推奨</strong>
+                                  </div>
+                                </div>
+                                <p className="price-drop-rounding">
+                                  次回の減額額は50円単位で切り上げています
+                                </p>
+                                <p
+                                  className={
+                                    priceDropInfo.isRelistRecommended
+                                      ? 'price-drop-return caution'
+                                      : 'price-drop-return'
+                                  }
+                                >
+                                  注意：{priceDropInfo.returnPriceMessage}
+                                </p>
+                              </>
+                            )}
+                          </section>
+
+                          {isSold && (
+                            <section className="detail-panel-section" aria-label="販売情報">
+                              <h5>販売情報</h5>
+                              <div className="detail-grid">
+                                <div className="detail-box">
+                                  <span>販売日</span>
+                                  <strong>{product.soldDate || '未入力'}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>販売先</span>
+                                  <strong>
+                                    {product.marketplace
+                                      ? getChannelLabel(product.marketplace)
+                                      : '未入力'}
+                                  </strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>販売価格</span>
+                                  <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>送料</span>
+                                  <strong>{formatYen(product.shippingFee ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>販売手数料率</span>
+                                  <strong>{formatFeeRate(product.feeRate ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>販売手数料</span>
+                                  <strong>{formatYen(product.platformFee ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>手数料後売価</span>
+                                  <strong>{formatYen(product.netSales ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>請求額</span>
+                                  <strong>{formatYen(product.billingAmount ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>販売者利益</span>
+                                  <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
+                                </div>
+                                <div className="detail-box">
+                                  <span>利益率</span>
+                                  <strong>{formatPercent(product.profitRate ?? 0)}</strong>
+                                </div>
+                              </div>
+                            </section>
+                          )}
+
+                          <section className="detail-panel-section" aria-label="操作">
+                            <h5>操作</h5>
+                            <div className="action-buttons">
+                              <button
+                                className="sale-product-button"
+                                type="button"
+                                onClick={() => handleOpenSaleForm(product)}
+                              >
+                                {isSold ? '売却情報を編集' : '販売登録'}
+                              </button>
+                              <button
+                                className="edit-product-button"
+                                type="button"
+                                onClick={() => handleEditProduct(product)}
+                              >
+                                商品情報を編集
+                              </button>
+                              <button
+                                className="delete-product-button"
+                                type="button"
+                                onClick={() => handleDeleteProduct(product.id)}
+                              >
+                                削除
+                              </button>
+                            </div>
+                          </section>
+
+                          {activeSaleProductId === product.id && activeSaleResult && (
+                            <section className="sale-form-section" aria-label="売却登録フォーム">
+                              <h5>{isSold ? '売却情報を編集' : '売却登録'}</h5>
+
+                              {saleError && <p className="form-message error">{saleError}</p>}
+                              {saleMessage && <p className="form-message success">{saleMessage}</p>}
+
+                              <label className="field-group">
+                                <span>販売日</span>
+                                <input
+                                  type="date"
+                                  value={saleForm.soldDate}
+                                  onChange={(event) => updateSaleForm('soldDate', event.target.value)}
+                                />
+                              </label>
+
+                              <label className="field-group">
+                                <span>販売先</span>
+                                <select
+                                  value={saleForm.marketplace}
+                                  onChange={(event) =>
+                                    handleSaleMarketplaceChange(event.target.value as SalesChannelId)
+                                  }
+                                >
+                                  {salesChannels.map((channel) => (
+                                    <option key={channel.id} value={channel.id}>
+                                      {channel.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+
+                              <label className="field-group">
+                                <span>販売価格</span>
+                                <div className="input-with-unit">
+                                  <input
+                                    inputMode="numeric"
+                                    min="0"
+                                    pattern="[0-9]*"
+                                    placeholder="例：10000"
+                                    type="number"
+                                    value={saleForm.soldPrice}
+                                    onChange={(event) =>
+                                      updateSaleForm('soldPrice', event.target.value)
+                                    }
+                                  />
+                                  <span>円</span>
+                                </div>
+                              </label>
+
+                              <label className="field-group">
+                                <span>送料</span>
+                                <div className="input-with-unit">
+                                  <input
+                                    inputMode="numeric"
+                                    min="0"
+                                    pattern="[0-9]*"
+                                    type="number"
+                                    value={saleForm.shippingFee}
+                                    onChange={(event) =>
+                                      updateSaleForm('shippingFee', event.target.value)
+                                    }
+                                  />
+                                  <span>円</span>
+                                </div>
+                              </label>
+
+                              <label className="field-group">
+                                <span>販売手数料率（％）</span>
+                                <div className="input-with-unit">
+                                  <input
+                                    inputMode="decimal"
+                                    max="100"
+                                    min="0"
+                                    step="0.1"
+                                    type="number"
+                                    value={saleForm.feeRate}
+                                    onChange={(event) => updateSaleForm('feeRate', event.target.value)}
+                                  />
+                                  <span>%</span>
+                                </div>
+                              </label>
+
+                              <div className="sale-result-highlight">
+                                <article>
+                                  <span>最終請求額</span>
+                                  <strong>{formatYen(activeSaleResult.finalCharge)}</strong>
+                                </article>
+                                <article>
+                                  <span>販売者利益</span>
+                                  <strong>{formatYen(activeSaleResult.sellerProfit)}</strong>
+                                </article>
+                              </div>
+
+                              <dl className="sale-calculation-list">
+                                <div>
+                                  <dt>販売手数料</dt>
+                                  <dd>{formatYen(activeSaleResult.salesFee)}</dd>
+                                </div>
+                                <div>
+                                  <dt>手数料後売価</dt>
+                                  <dd>{formatYen(activeSaleResult.priceAfterFee)}</dd>
+                                </div>
+                                <div>
+                                  <dt>利益率</dt>
+                                  <dd>{formatPercent(activeSaleResult.profitRate)}</dd>
+                                </div>
+                                <div>
+                                  <dt>最低請求額</dt>
+                                  <dd>
+                                    {activeSaleResult.isMinimumChargeApplied
+                                      ? '最低請求額適用'
+                                      : '最低請求額適用なし'}
+                                  </dd>
+                                </div>
+                              </dl>
+
+                              <div className="sale-form-actions">
+                                <button
+                                  className="primary-submit-button"
+                                  type="button"
+                                  onClick={() => handleSaleSubmit(product)}
+                                >
+                                  売却情報を登録する
+                                </button>
+                                <button
+                                  className="secondary-button"
+                                  type="button"
+                                  onClick={handleCancelSaleForm}
+                                >
+                                  キャンセル
+                                </button>
+                              </div>
+                            </section>
+                          )}
+                        </div>
+                      )}
                     </article>
                   )
                 })}
