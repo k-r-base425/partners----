@@ -44,6 +44,16 @@ type Product = {
   status: ProductStatus
   memo: string
   createdAt: string
+  soldDate?: string
+  marketplace?: SalesChannelId
+  soldPrice?: number
+  shippingFee?: number
+  feeRate?: number
+  platformFee?: number
+  netSales?: number
+  billingAmount?: number
+  sellerProfit?: number
+  profitRate?: number
 }
 
 type PriceDropInfo =
@@ -72,6 +82,14 @@ type ProductFormState = Omit<
   startPrice: string
   targetPrice: string
   internalLowestPrice: string
+}
+
+type SaleFormState = {
+  soldDate: string
+  marketplace: SalesChannelId
+  soldPrice: string
+  shippingFee: string
+  feeRate: string
 }
 
 type StatusFilter = ProductStatus | 'すべて'
@@ -151,6 +169,15 @@ const getProductCodeNumber = (code: string) => {
   const match = code.match(/^BT-(\d+)$/)
   return match ? Number(match[1]) : 0
 }
+const getTodayString = () => new Date().toISOString().slice(0, 10)
+const getChannelLabel = (channelId: SalesChannelId) =>
+  salesChannels.find((channel) => channel.id === channelId)?.label ?? channelId
+const getDefaultFeeRatePercent = (channelId: SalesChannelId) => {
+  const channel = salesChannels.find((item) => item.id === channelId) ?? salesChannels[0]
+  return String(channel.feeRate * 100)
+}
+const getCalculationProductType = (category: ProductCategory): ProductTypeId =>
+  category === 'longSleeve' ? 'long-sleeve-band-t' : 'short-sleeve-band-t'
 
 const createInitialProductForm = (): ProductFormState => ({
   name: '',
@@ -162,6 +189,17 @@ const createInitialProductForm = (): ProductFormState => ({
   listingDate: '',
   status: '販売中',
   memo: '',
+})
+
+const createSaleForm = (product?: Product): SaleFormState => ({
+  soldDate: product?.soldDate || getTodayString(),
+  marketplace: product?.marketplace || 'mercari',
+  soldPrice: product?.soldPrice ? String(product.soldPrice) : '',
+  shippingFee: product?.shippingFee ? String(product.shippingFee) : '215',
+  feeRate:
+    product?.feeRate !== undefined
+      ? String(product.feeRate * 100)
+      : getDefaultFeeRatePercent(product?.marketplace || 'mercari'),
 })
 
 const getProductPriceValues = (form: ProductFormState) => {
@@ -244,6 +282,10 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     source.internalLowestPrice === undefined
       ? startPrice
       : toStoredNonNegativeNumber(source.internalLowestPrice, startPrice)
+  const marketplace: SalesChannelId | undefined =
+    source.marketplace === 'mercari' || source.marketplace === 'yahoo-fleamarket'
+      ? source.marketplace
+      : undefined
 
   return {
     id: typeof source.id === 'string' && source.id ? source.id : `${Date.now()}-${index}`,
@@ -258,6 +300,28 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     status,
     memo: typeof source.memo === 'string' ? source.memo : '',
     createdAt,
+    soldDate: typeof source.soldDate === 'string' ? source.soldDate : undefined,
+    marketplace,
+    soldPrice:
+      source.soldPrice === undefined ? undefined : toStoredNonNegativeNumber(source.soldPrice),
+    shippingFee:
+      source.shippingFee === undefined ? undefined : toStoredNonNegativeNumber(source.shippingFee),
+    feeRate:
+      source.feeRate === undefined ? undefined : toStoredNonNegativeNumber(source.feeRate),
+    platformFee:
+      source.platformFee === undefined ? undefined : toStoredNonNegativeNumber(source.platformFee),
+    netSales:
+      source.netSales === undefined ? undefined : toStoredNonNegativeNumber(source.netSales),
+    billingAmount:
+      source.billingAmount === undefined
+        ? undefined
+        : toStoredNonNegativeNumber(source.billingAmount),
+    sellerProfit:
+      source.sellerProfit === undefined
+        ? undefined
+        : toStoredNonNegativeNumber(source.sellerProfit),
+    profitRate:
+      source.profitRate === undefined ? undefined : toStoredNonNegativeNumber(source.profitRate),
   }
 }
 
@@ -306,6 +370,10 @@ function App() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
+  const [activeSaleProductId, setActiveSaleProductId] = useState<string | null>(null)
+  const [saleForm, setSaleForm] = useState<SaleFormState>(() => createSaleForm())
+  const [saleError, setSaleError] = useState('')
+  const [saleMessage, setSaleMessage] = useState('')
   const productFormRef = useRef<HTMLFormElement | null>(null)
 
   const feeRatePercent = clampFeeRatePercent(toNumber(feeRateInput))
@@ -345,6 +413,16 @@ function App() {
     return matchesStatus && matchesCategory
   })
   const editingProduct = products.find((product) => product.id === editingProductId)
+  const activeSaleProduct = products.find((product) => product.id === activeSaleProductId)
+  const activeSaleResult = activeSaleProduct
+    ? calculateSalesResult({
+        salesChannel: saleForm.marketplace,
+        productType: getCalculationProductType(activeSaleProduct.category),
+        salePrice: toNumber(saleForm.soldPrice),
+        shippingFee: toNumber(saleForm.shippingFee),
+        feeRate: clampFeeRatePercent(toNumber(saleForm.feeRate)) / 100,
+      })
+    : null
 
   const dashboardCards: DashboardCard[] = [
     { label: '登録商品数', value: String(products.length) },
@@ -386,10 +464,29 @@ function App() {
     setProductMessage('')
   }
 
+  const updateSaleForm = <Key extends keyof SaleFormState>(
+    key: Key,
+    value: SaleFormState[Key],
+  ) => {
+    setSaleForm((current) => ({ ...current, [key]: value }))
+    setSaleError('')
+    setSaleMessage('')
+  }
+
   const handleSalesChannelChange = (value: SalesChannelId) => {
     const nextChannel = salesChannels.find((channel) => channel.id === value) ?? salesChannels[0]
     setSalesChannel(value)
     setFeeRateInput(String(nextChannel.feeRate * 100))
+  }
+
+  const handleSaleMarketplaceChange = (value: SalesChannelId) => {
+    setSaleForm((current) => ({
+      ...current,
+      marketplace: value,
+      feeRate: getDefaultFeeRatePercent(value),
+    }))
+    setSaleError('')
+    setSaleMessage('')
   }
 
   const resetProductForm = () => {
@@ -469,6 +566,60 @@ function App() {
     setProductMessage('')
   }
 
+  const handleOpenSaleForm = (product: Product) => {
+    setActiveSaleProductId(product.id)
+    setSaleForm(createSaleForm(product))
+    setSaleError('')
+    setSaleMessage('')
+  }
+
+  const handleCancelSaleForm = () => {
+    setActiveSaleProductId(null)
+    setSaleForm(createSaleForm())
+    setSaleError('')
+  }
+
+  const handleSaleSubmit = (product: Product) => {
+    const saleResult = calculateSalesResult({
+      salesChannel: saleForm.marketplace,
+      productType: getCalculationProductType(product.category),
+      salePrice: toNumber(saleForm.soldPrice),
+      shippingFee: toNumber(saleForm.shippingFee),
+      feeRate: clampFeeRatePercent(toNumber(saleForm.feeRate)) / 100,
+    })
+
+    if (saleResult.salePrice <= 0) {
+      setSaleError('販売価格を入力してください。')
+      setSaleMessage('')
+      return
+    }
+
+    setProducts((current) =>
+      current.map((item) =>
+        item.id === product.id
+          ? {
+              ...item,
+              status: item.status === '請求済み' ? item.status : '請求待ち',
+              soldDate: saleForm.soldDate,
+              marketplace: saleForm.marketplace,
+              soldPrice: saleResult.salePrice,
+              shippingFee: toNumber(saleForm.shippingFee),
+              feeRate: saleResult.feeRate,
+              platformFee: saleResult.salesFee,
+              netSales: saleResult.priceAfterFee,
+              billingAmount: saleResult.finalCharge,
+              sellerProfit: saleResult.sellerProfit,
+              profitRate: saleResult.profitRate,
+            }
+          : item,
+      ),
+    )
+    setActiveSaleProductId(null)
+    setSaleForm(createSaleForm())
+    setSaleError('')
+    setSaleMessage('売却情報を登録しました。')
+  }
+
   const handleDeleteProduct = (productId: string) => {
     if (!window.confirm('この商品を削除しますか？')) {
       return
@@ -477,6 +628,9 @@ function App() {
     setProducts((current) => current.filter((product) => product.id !== productId))
     if (editingProductId === productId) {
       resetProductForm()
+    }
+    if (activeSaleProductId === productId) {
+      handleCancelSaleForm()
     }
     setProductMessage('商品を削除しました。')
     setProductError('')
@@ -801,6 +955,7 @@ function App() {
 
           <section className="product-list-section" aria-labelledby="product-list-title">
             <h3 id="product-list-title">登録済み商品一覧</h3>
+            {saleMessage && <p className="form-message success">{saleMessage}</p>}
 
             <div className="product-list-controls">
               <div className="product-counts">
@@ -944,9 +1099,200 @@ function App() {
                         )}
                       </section>
 
+                      {product.soldPrice !== undefined && (
+                        <section className="sale-info-section" aria-label="売却情報">
+                          <h5>売却情報</h5>
+                          <dl className="sale-info-list">
+                            <div>
+                              <dt>販売日</dt>
+                              <dd>{product.soldDate || '未入力'}</dd>
+                            </div>
+                            <div>
+                              <dt>販売先</dt>
+                              <dd>{product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}</dd>
+                            </div>
+                            <div>
+                              <dt>販売価格</dt>
+                              <dd>{formatYen(product.soldPrice)}</dd>
+                            </div>
+                            <div>
+                              <dt>送料</dt>
+                              <dd>{formatYen(product.shippingFee ?? 0)}</dd>
+                            </div>
+                            <div>
+                              <dt>販売手数料率</dt>
+                              <dd>{formatFeeRate(product.feeRate ?? 0)}</dd>
+                            </div>
+                            <div>
+                              <dt>販売手数料</dt>
+                              <dd>{formatYen(product.platformFee ?? 0)}</dd>
+                            </div>
+                            <div>
+                              <dt>手数料後売価</dt>
+                              <dd>{formatYen(product.netSales ?? 0)}</dd>
+                            </div>
+                            <div>
+                              <dt>請求額</dt>
+                              <dd>{formatYen(product.billingAmount ?? 0)}</dd>
+                            </div>
+                            <div>
+                              <dt>販売者利益</dt>
+                              <dd>{formatYen(product.sellerProfit ?? 0)}</dd>
+                            </div>
+                            <div>
+                              <dt>利益率</dt>
+                              <dd>{formatPercent(product.profitRate ?? 0)}</dd>
+                            </div>
+                          </dl>
+                        </section>
+                      )}
+
+                      {activeSaleProductId === product.id && activeSaleResult && (
+                        <section className="sale-form-section" aria-label="売却登録フォーム">
+                          <h5>
+                            {product.soldPrice !== undefined ? '売却情報を編集' : '売却登録'}
+                          </h5>
+
+                          {saleError && <p className="form-message error">{saleError}</p>}
+                          {saleMessage && <p className="form-message success">{saleMessage}</p>}
+
+                          <label className="field-group">
+                            <span>販売日</span>
+                            <input
+                              type="date"
+                              value={saleForm.soldDate}
+                              onChange={(event) => updateSaleForm('soldDate', event.target.value)}
+                            />
+                          </label>
+
+                          <label className="field-group">
+                            <span>販売先</span>
+                            <select
+                              value={saleForm.marketplace}
+                              onChange={(event) =>
+                                handleSaleMarketplaceChange(event.target.value as SalesChannelId)
+                              }
+                            >
+                              {salesChannels.map((channel) => (
+                                <option key={channel.id} value={channel.id}>
+                                  {channel.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="field-group">
+                            <span>販売価格</span>
+                            <div className="input-with-unit">
+                              <input
+                                inputMode="numeric"
+                                min="0"
+                                pattern="[0-9]*"
+                                placeholder="例：10000"
+                                type="number"
+                                value={saleForm.soldPrice}
+                                onChange={(event) => updateSaleForm('soldPrice', event.target.value)}
+                              />
+                              <span>円</span>
+                            </div>
+                          </label>
+
+                          <label className="field-group">
+                            <span>送料</span>
+                            <div className="input-with-unit">
+                              <input
+                                inputMode="numeric"
+                                min="0"
+                                pattern="[0-9]*"
+                                type="number"
+                                value={saleForm.shippingFee}
+                                onChange={(event) =>
+                                  updateSaleForm('shippingFee', event.target.value)
+                                }
+                              />
+                              <span>円</span>
+                            </div>
+                          </label>
+
+                          <label className="field-group">
+                            <span>販売手数料率（％）</span>
+                            <div className="input-with-unit">
+                              <input
+                                inputMode="decimal"
+                                max="100"
+                                min="0"
+                                step="0.1"
+                                type="number"
+                                value={saleForm.feeRate}
+                                onChange={(event) => updateSaleForm('feeRate', event.target.value)}
+                              />
+                              <span>%</span>
+                            </div>
+                          </label>
+
+                          <div className="sale-result-highlight">
+                            <article>
+                              <span>最終請求額</span>
+                              <strong>{formatYen(activeSaleResult.finalCharge)}</strong>
+                            </article>
+                            <article>
+                              <span>販売者利益</span>
+                              <strong>{formatYen(activeSaleResult.sellerProfit)}</strong>
+                            </article>
+                          </div>
+
+                          <dl className="sale-calculation-list">
+                            <div>
+                              <dt>販売手数料</dt>
+                              <dd>{formatYen(activeSaleResult.salesFee)}</dd>
+                            </div>
+                            <div>
+                              <dt>手数料後売価</dt>
+                              <dd>{formatYen(activeSaleResult.priceAfterFee)}</dd>
+                            </div>
+                            <div>
+                              <dt>利益率</dt>
+                              <dd>{formatPercent(activeSaleResult.profitRate)}</dd>
+                            </div>
+                            <div>
+                              <dt>最低請求額</dt>
+                              <dd>
+                                {activeSaleResult.isMinimumChargeApplied
+                                  ? '最低請求額適用'
+                                  : '最低請求額適用なし'}
+                              </dd>
+                            </div>
+                          </dl>
+
+                          <div className="sale-form-actions">
+                            <button
+                              className="primary-submit-button"
+                              type="button"
+                              onClick={() => handleSaleSubmit(product)}
+                            >
+                              売却情報を登録する
+                            </button>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              onClick={handleCancelSaleForm}
+                            >
+                              キャンセル
+                            </button>
+                          </div>
+                        </section>
+                      )}
+
                       {product.memo && <p className="product-memo">{product.memo}</p>}
 
                       <div className="product-card-actions">
+                        <button
+                          className="sale-product-button"
+                          type="button"
+                          onClick={() => handleOpenSaleForm(product)}
+                        >
+                          {product.soldPrice !== undefined ? '売却情報を編集' : '売却登録'}
+                        </button>
                         <button
                           className="edit-product-button"
                           type="button"
