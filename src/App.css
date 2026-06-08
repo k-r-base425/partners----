@@ -391,6 +391,38 @@
 
 .product-form {
   background: #fbfcfe;
+  scroll-margin-top: 16px;
+}
+
+.editing-notice {
+  background: #eef5ff;
+  border: 1px solid #cfe1f8;
+  border-radius: 12px;
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.editing-notice strong {
+  color: #1f5f9f;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.editing-notice span {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.editing-notice p {
+  color: #52647b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.55;
+  margin: 0;
 }
 
 .form-message {

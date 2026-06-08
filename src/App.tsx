@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   calculateSalesResult,
   productTypes,
@@ -306,6 +306,7 @@ function App() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
+  const productFormRef = useRef<HTMLFormElement | null>(null)
 
   const feeRatePercent = clampFeeRatePercent(toNumber(feeRateInput))
   const salesResult = calculateSalesResult({
@@ -343,6 +344,7 @@ function App() {
     const matchesCategory = categoryFilter === 'すべて' || product.category === categoryFilter
     return matchesStatus && matchesCategory
   })
+  const editingProduct = products.find((product) => product.id === editingProductId)
 
   const dashboardCards: DashboardCard[] = [
     { label: '登録商品数', value: String(products.length) },
@@ -453,7 +455,13 @@ function App() {
     })
     setEditingProductId(product.id)
     setProductError('')
-    setProductMessage(`${product.code} を編集中です。`)
+    setProductMessage('商品情報を編集モードにしました。')
+    window.requestAnimationFrame(() => {
+      productFormRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
   }
 
   const handleCancelEdit = () => {
@@ -641,8 +649,16 @@ function App() {
     if (activeScreen === 'products') {
       return (
         <div className="products-layout">
-          <form className="form-card product-form" onSubmit={handleProductSubmit}>
+          <form className="form-card product-form" ref={productFormRef} onSubmit={handleProductSubmit}>
             <h3>{editingProductId ? '商品編集' : '商品登録'}</h3>
+
+            {editingProduct && (
+              <div className="editing-notice">
+                <strong>商品情報を編集中</strong>
+                <span>{editingProduct.code} を編集中</span>
+                <p>内容を修正して、商品を更新するボタンを押してください。</p>
+              </div>
+            )}
 
             {productError && <p className="form-message error">{productError}</p>}
             {productMessage && <p className="form-message success">{productMessage}</p>}
