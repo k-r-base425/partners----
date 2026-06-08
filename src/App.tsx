@@ -1,121 +1,93 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
 
+type MenuItem = {
+  id: string
+  label: string
+}
+
+const menus: MenuItem[] = [
+  { id: 'dashboard', label: 'ダッシュボード' },
+  { id: 'simulation', label: '利益シミュレーション' },
+  { id: 'product-form', label: '商品登録' },
+  { id: 'product-list', label: '商品一覧' },
+  { id: 'billing', label: '請求管理' },
+  { id: 'sales', label: '販売実績' },
+  { id: 'rules', label: '販売ルール' },
+  { id: 'documents', label: '資料管理' },
+]
+
+const dashboardCards = [
+  { label: '登録商品数', value: '0' },
+  { label: '販売中', value: '0' },
+  { label: '売却済み', value: '0' },
+  { label: '請求待ち', value: '0' },
+  { label: '請求済み', value: '0' },
+  { label: '今月の販売額', value: '0円' },
+  { label: '今月の請求額', value: '0円' },
+  { label: '今月の利益', value: '0円' },
+]
+
+const placeholderText: Record<string, string> = {
+  simulation: 'ここに販売利益シミュレーション機能を作成予定です',
+  'product-form': 'ここに商品登録機能を作成予定です',
+  'product-list': 'ここに商品一覧を表示予定です',
+  billing: 'ここに請求管理機能を作成予定です',
+  sales: 'ここに販売実績を表示予定です',
+  rules: 'ここに販売ルールを表示予定です',
+  documents: 'ここにPDF資料管理機能を作成予定です',
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeMenu, setActiveMenu] = useState<MenuItem['id']>('dashboard')
+  const activeLabel = menus.find((menu) => menu.id === activeMenu)?.label
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="app-shell">
+      <header className="app-header">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+          <h1>販売委託管理アプリ</h1>
+          <p>古着販売パートナー向け管理ツール</p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </header>
 
-      <div className="ticks"></div>
+      <nav className="app-nav" aria-label="メインメニュー">
+        {menus.map((menu) => (
+          <button
+            key={menu.id}
+            type="button"
+            className={activeMenu === menu.id ? 'nav-button active' : 'nav-button'}
+            onClick={() => setActiveMenu(menu.id)}
+          >
+            {menu.label}
+          </button>
+        ))}
+      </nav>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <main className="app-main">
+        <section className="content-panel">
+          <div className="section-heading">
+            <span>現在の画面</span>
+            <h2>{activeLabel}</h2>
+          </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          {activeMenu === 'dashboard' ? (
+            <div className="dashboard-grid">
+              {dashboardCards.map((card) => (
+                <article className="dashboard-card" key={card.label}>
+                  <p>{card.label}</p>
+                  <strong>{card.value}</strong>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="placeholder-panel">
+              <p>{placeholderText[activeMenu]}</p>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
   )
 }
 
