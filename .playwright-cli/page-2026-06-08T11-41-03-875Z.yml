@@ -1,0 +1,55 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "販売委託管理アプリ" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 古着販売パートナー向け管理ツール
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: 現在の画面
+        - heading "請求管理" [level=2] [ref=e69]
+      - generic [ref=e70]:
+        - region "請求サマリー" [ref=e71]:
+          - heading "請求サマリー" [level=3] [ref=e72]
+          - generic [ref=e73]:
+            - article [ref=e74]:
+              - generic [ref=e75]: 請求待ち件数
+              - strong [ref=e76]: 0件
+            - article [ref=e77]:
+              - generic [ref=e78]: 請求待ち合計額
+              - strong [ref=e79]: 0円
+            - article [ref=e80]:
+              - generic [ref=e81]: 請求済み件数
+              - strong [ref=e82]: 0件
+            - article [ref=e83]:
+              - generic [ref=e84]: 請求済み合計額
+              - strong [ref=e85]: 0円
+            - article [ref=e86]:
+              - generic [ref=e87]: 売却済み商品の販売者利益合計
+              - strong [ref=e88]: 0円
+        - region "請求待ち一覧" [ref=e89]:
+          - generic [ref=e90]:
+            - heading "請求待ち一覧" [level=3] [ref=e91]
+            - generic [ref=e92]: 0件
+          - paragraph [ref=e93]: 請求待ちの商品はありません
+        - region "請求済み一覧" [ref=e94]:
+          - generic [ref=e95]:
+            - heading "請求済み一覧" [level=3] [ref=e96]
+            - generic [ref=e97]: 0件
+          - button "請求済み一覧を開く" [ref=e98] [cursor=pointer]
+  - navigation "下部メニュー" [ref=e53]:
+    - button "ホーム" [ref=e54] [cursor=pointer]:
+      - generic [ref=e55]: 🏠
+      - generic [ref=e56]: ホーム
+    - button "計算" [ref=e57] [cursor=pointer]:
+      - generic [ref=e58]: 🧮
+      - generic [ref=e59]: 計算
+    - button "商品" [ref=e60] [cursor=pointer]:
+      - generic [ref=e61]: 👕
+      - generic [ref=e62]: 商品
+    - button "請求" [active] [ref=e63] [cursor=pointer]:
+      - generic [ref=e64]: 💰
+      - generic [ref=e65]: 請求
+    - button "実績" [ref=e66] [cursor=pointer]:
+      - generic [ref=e67]: 📊
+      - generic [ref=e68]: 実績

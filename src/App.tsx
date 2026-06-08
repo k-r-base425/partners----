@@ -53,6 +53,7 @@ type Product = {
   billingAmount?: number
   sellerProfit?: number
   profitRate?: number
+  billedDate?: string
 }
 
 type PriceDropInfo =
@@ -190,6 +191,10 @@ const getDefaultFeeRatePercent = (channelId: SalesChannelId) => {
 }
 const getCalculationProductType = (category: ProductCategory): ProductTypeId =>
   category === 'longSleeve' ? 'long-sleeve-band-t' : 'short-sleeve-band-t'
+const hasBillingData = (product: Product) =>
+  product.soldPrice !== undefined &&
+  product.billingAmount !== undefined &&
+  product.sellerProfit !== undefined
 
 const createInitialProductForm = (): ProductFormState => ({
   name: '',
@@ -332,6 +337,7 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
         : toStoredNumber(source.sellerProfit),
     profitRate:
       source.profitRate === undefined ? undefined : toStoredNumber(source.profitRate),
+    billedDate: typeof source.billedDate === 'string' ? source.billedDate : undefined,
   }
 }
 
@@ -384,6 +390,8 @@ function App() {
   const [saleForm, setSaleForm] = useState<SaleFormState>(() => createSaleForm())
   const [saleError, setSaleError] = useState('')
   const [saleMessage, setSaleMessage] = useState('')
+  const [billingMessage, setBillingMessage] = useState('')
+  const [isBilledListOpen, setIsBilledListOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>({})
   const productFormRef = useRef<HTMLFormElement | null>(null)
 
@@ -434,6 +442,25 @@ function App() {
         feeRate: clampFeeRatePercent(toNumber(saleForm.feeRate)) / 100,
       })
     : null
+  const billableProducts = sortedProducts.filter(hasBillingData)
+  const pendingBillingProducts = billableProducts.filter((product) => product.status === '請求待ち')
+  const billedProducts = billableProducts.filter((product) => product.status === '請求済み')
+  const billingSummary = {
+    pendingCount: pendingBillingProducts.length,
+    pendingTotal: pendingBillingProducts.reduce(
+      (total, product) => total + (product.billingAmount ?? 0),
+      0,
+    ),
+    billedCount: billedProducts.length,
+    billedTotal: billedProducts.reduce(
+      (total, product) => total + (product.billingAmount ?? 0),
+      0,
+    ),
+    sellerProfitTotal: billableProducts.reduce(
+      (total, product) => total + (product.sellerProfit ?? 0),
+      0,
+    ),
+  }
 
   const dashboardCards: DashboardCard[] = [
     { label: '登録商品数', value: String(products.length) },
@@ -654,6 +681,37 @@ function App() {
     setSaleMessage('売却情報を登録しました。')
   }
 
+  const handleMarkAsBilled = (productId: string) => {
+    setProducts((current) =>
+      current.map((product) =>
+        product.id === productId
+          ? {
+              ...product,
+              status: '請求済み',
+              billedDate: getTodayString(),
+            }
+          : product,
+      ),
+    )
+    setBillingMessage('請求済みにしました。')
+    setIsBilledListOpen(true)
+  }
+
+  const handleReturnToPendingBilling = (productId: string) => {
+    setProducts((current) =>
+      current.map((product) =>
+        product.id === productId
+          ? {
+              ...product,
+              status: '請求待ち',
+              billedDate: undefined,
+            }
+          : product,
+      ),
+    )
+    setBillingMessage('請求待ちに戻しました。')
+  }
+
   const handleDeleteProduct = (productId: string) => {
     if (!window.confirm('この商品を削除しますか？')) {
       return
@@ -674,6 +732,64 @@ function App() {
     setProductMessage('商品を削除しました。')
     setProductError('')
   }
+
+  const renderBillingProductCard = (product: Product, variant: 'pending' | 'billed') => (
+    <article className="billing-product-card" key={product.id}>
+      <div className="billing-product-header">
+        <div>
+          <h4>{product.name}</h4>
+          <p>
+            {product.code || '商品番号なし'} / {getCategoryLabel(product.category)}
+          </p>
+        </div>
+        <span className={variant === 'billed' ? 'billing-status billed' : 'billing-status'}>
+          {variant === 'billed' ? '請求済み' : '請求待ち'}
+        </span>
+      </div>
+
+      <div className="billing-product-meta">
+        <span>販売日：{product.soldDate || '未入力'}</span>
+        {variant === 'billed' && <span>請求済み日：{product.billedDate || '未入力'}</span>}
+        <span>
+          販売先：
+          {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
+        </span>
+      </div>
+
+      <div className="billing-product-amounts">
+        <div>
+          <span>販売価格</span>
+          <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+        </div>
+        <div>
+          <span>請求額</span>
+          <strong>{formatYen(product.billingAmount ?? 0)}</strong>
+        </div>
+        <div>
+          <span>販売者利益</span>
+          <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
+        </div>
+      </div>
+
+      {variant === 'pending' ? (
+        <button
+          className="billing-primary-button"
+          type="button"
+          onClick={() => handleMarkAsBilled(product.id)}
+        >
+          請求済みにする
+        </button>
+      ) : (
+        <button
+          className="billing-secondary-button"
+          type="button"
+          onClick={() => handleReturnToPendingBilling(product.id)}
+        >
+          請求待ちに戻す
+        </button>
+      )}
+    </article>
+  )
 
   const renderContent = () => {
     if (activeScreen === 'dashboard') {
@@ -1402,6 +1518,81 @@ function App() {
       )
     }
 
+    if (activeScreen === 'billing') {
+      return (
+        <div className="billing-layout">
+          {billingMessage && <p className="form-message success">{billingMessage}</p>}
+
+          <section className="billing-summary-card" aria-labelledby="billing-summary-title">
+            <h3 id="billing-summary-title">請求サマリー</h3>
+            <div className="billing-summary-grid">
+              <article>
+                <span>請求待ち件数</span>
+                <strong>{billingSummary.pendingCount}件</strong>
+              </article>
+              <article>
+                <span>請求待ち合計額</span>
+                <strong>{formatYen(billingSummary.pendingTotal)}</strong>
+              </article>
+              <article>
+                <span>請求済み件数</span>
+                <strong>{billingSummary.billedCount}件</strong>
+              </article>
+              <article>
+                <span>請求済み合計額</span>
+                <strong>{formatYen(billingSummary.billedTotal)}</strong>
+              </article>
+              <article className="billing-summary-wide">
+                <span>売却済み商品の販売者利益合計</span>
+                <strong>{formatYen(billingSummary.sellerProfitTotal)}</strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="billing-list-section" aria-labelledby="pending-billing-title">
+            <div className="billing-section-heading">
+              <h3 id="pending-billing-title">請求待ち一覧</h3>
+              <span>{pendingBillingProducts.length}件</span>
+            </div>
+
+            {pendingBillingProducts.length === 0 ? (
+              <p className="empty-list-message">請求待ちの商品はありません</p>
+            ) : (
+              <div className="billing-card-list">
+                {pendingBillingProducts.map((product) =>
+                  renderBillingProductCard(product, 'pending'),
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="billing-list-section" aria-labelledby="billed-products-title">
+            <div className="billing-section-heading">
+              <h3 id="billed-products-title">請求済み一覧</h3>
+              <span>{billedProducts.length}件</span>
+            </div>
+
+            <button
+              className="billing-toggle-button"
+              type="button"
+              onClick={() => setIsBilledListOpen((current) => !current)}
+            >
+              {isBilledListOpen ? '請求済み一覧を閉じる' : '請求済み一覧を開く'}
+            </button>
+
+            {isBilledListOpen &&
+              (billedProducts.length === 0 ? (
+                <p className="empty-list-message">請求済みの商品はありません</p>
+              ) : (
+                <div className="billing-card-list">
+                  {billedProducts.map((product) => renderBillingProductCard(product, 'billed'))}
+                </div>
+              ))}
+          </section>
+        </div>
+      )
+    }
+
     if (activeScreen === 'resources') {
       return (
         <div className="feature-card-grid">
@@ -1415,8 +1606,7 @@ function App() {
       )
     }
 
-    const placeholderText: Record<Exclude<ScreenId, 'dashboard' | 'simulation' | 'products' | 'resources'>, string> = {
-      billing: 'ここに請求管理機能を作成予定です',
+    const placeholderText: Record<Exclude<ScreenId, 'dashboard' | 'simulation' | 'products' | 'resources' | 'billing'>, string> = {
       sales: 'ここに販売実績を表示予定です',
     }
 
