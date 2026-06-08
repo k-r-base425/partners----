@@ -753,7 +753,8 @@
 
 .sale-info-section,
 .sale-form-section,
-.product-detail-section {
+.product-detail-section,
+.product-operation-section {
   background: #fbfcfe;
   border: 1px solid #e1e9f3;
   border-radius: 12px;
@@ -765,7 +766,8 @@
 
 .sale-info-section h5,
 .sale-form-section h5,
-.product-detail-section h5 {
+.product-detail-section h5,
+.product-operation-section h5 {
   color: #172033;
   font-size: 14px;
   font-weight: 900;
@@ -774,14 +776,16 @@
 }
 
 .sale-info-list,
-.sale-calculation-list {
+.sale-calculation-list,
+.product-extra-detail-list {
   display: grid;
   gap: 0;
   margin: 0;
 }
 
 .sale-info-list div,
-.sale-calculation-list div {
+.sale-calculation-list div,
+.product-extra-detail-list div {
   align-items: center;
   border-top: 1px solid #edf2f7;
   display: flex;
@@ -792,12 +796,14 @@
 }
 
 .sale-info-list div:first-child,
-.sale-calculation-list div:first-child {
+.sale-calculation-list div:first-child,
+.product-extra-detail-list div:first-child {
   border-top: 0;
 }
 
 .sale-info-list dt,
-.sale-calculation-list dt {
+.sale-calculation-list dt,
+.product-extra-detail-list dt {
   color: #5f7088;
   font-size: 12px;
   font-weight: 800;
@@ -805,7 +811,8 @@
 }
 
 .sale-info-list dd,
-.sale-calculation-list dd {
+.sale-calculation-list dd,
+.product-extra-detail-list dd {
   color: #172033;
   font-size: 13px;
   font-weight: 900;
@@ -851,6 +858,12 @@
 .sale-form-actions {
   display: grid;
   gap: 8px;
+}
+
+.operation-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
 }
 
 .sale-summary-list {

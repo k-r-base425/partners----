@@ -98,6 +98,7 @@ type ExpandedSections = Record<
     discount?: boolean
     sales?: boolean
     detail?: boolean
+    actions?: boolean
   }
 >
 
@@ -1042,6 +1043,7 @@ function App() {
                   const isDiscountExpanded = isSectionExpanded(product.id, 'discount')
                   const isSalesExpanded = isSectionExpanded(product.id, 'sales')
                   const isDetailExpanded = isSectionExpanded(product.id, 'detail')
+                  const isActionsExpanded = isSectionExpanded(product.id, 'actions')
 
                   return (
                     <article className="product-card" key={product.id}>
@@ -1055,28 +1057,18 @@ function App() {
 
                       <dl className="product-detail-list">
                         <div>
-                          <dt>商品種別</dt>
-                          <dd>{getCategoryLabel(product.category)}</dd>
-                        </div>
-                        <div>
-                          <dt>サイズ</dt>
-                          <dd>{product.size}</dd>
-                        </div>
-                        <div>
-                          <dt>出品開始価格</dt>
-                          <dd>{formatYen(product.startPrice)}</dd>
-                        </div>
-                        <div>
-                          <dt>売りたい価格</dt>
-                          <dd>{formatYen(product.targetPrice)}</dd>
+                          <dt>商品種別 / サイズ</dt>
+                          <dd>
+                            {getCategoryLabel(product.category)} / {product.size}
+                          </dd>
                         </div>
                         <div>
                           <dt>内部最低価格</dt>
                           <dd>{formatYen(product.internalLowestPrice)}</dd>
                         </div>
                         <div>
-                          <dt>出品日</dt>
-                          <dd>{product.listingDate || '未出品'}</dd>
+                          <dt>売りたい価格</dt>
+                          <dd>{formatYen(product.targetPrice)}</dd>
                         </div>
                       </dl>
 
@@ -1345,13 +1337,53 @@ function App() {
                       )}
 
                       {isDetailExpanded && (
-                        <section className="product-detail-section" aria-label="詳細情報">
-                          <h5>詳細情報</h5>
+                        <section className="product-detail-section" aria-label="商品詳細">
+                          <h5>商品詳細</h5>
+                          <dl className="product-extra-detail-list">
+                            <div>
+                              <dt>商品種別</dt>
+                              <dd>{getCategoryLabel(product.category)}</dd>
+                            </div>
+                            <div>
+                              <dt>サイズ</dt>
+                              <dd>{product.size}</dd>
+                            </div>
+                            <div>
+                              <dt>出品開始価格</dt>
+                              <dd>{formatYen(product.startPrice)}</dd>
+                            </div>
+                            <div>
+                              <dt>出品日</dt>
+                              <dd>{product.listingDate || '未出品'}</dd>
+                            </div>
+                          </dl>
                           {product.memo ? (
                             <p className="product-memo">{product.memo}</p>
                           ) : (
-                            <p className="product-memo empty">メモはありません</p>
+                            <p className="product-memo empty">メモなし</p>
                           )}
+                        </section>
+                      )}
+
+                      {isActionsExpanded && (
+                        <section className="product-operation-section" aria-label="操作">
+                          <h5>操作</h5>
+                          <div className="operation-actions">
+                            <button
+                              className="edit-product-button"
+                              type="button"
+                              onClick={() => handleEditProduct(product)}
+                            >
+                              商品情報を編集
+                            </button>
+                            <button
+                              className="delete-product-button"
+                              type="button"
+                              onClick={() => handleDeleteProduct(product.id)}
+                            >
+                              削除
+                            </button>
+                          </div>
                         </section>
                       )}
 
@@ -1361,14 +1393,14 @@ function App() {
                           type="button"
                           onClick={() => handleOpenSaleForm(product)}
                         >
-                          {product.soldPrice !== undefined ? '売却情報を編集' : '売却登録'}
+                          {product.soldPrice !== undefined ? '売却情報を編集' : '販売登録'}
                         </button>
                         <button
                           className="collapse-section-button"
                           type="button"
                           onClick={() => toggleProductSection(product.id, 'discount')}
                         >
-                          {isDiscountExpanded ? '値下げ運用を閉じる' : '値下げ運用を見る'}
+                          {isDiscountExpanded ? '値下げ運用を閉じる' : '値下げ運用を開く'}
                         </button>
                         {product.soldPrice !== undefined && (
                           <button
@@ -1376,7 +1408,7 @@ function App() {
                             type="button"
                             onClick={() => toggleProductSection(product.id, 'sales')}
                           >
-                            {isSalesExpanded ? '販売情報を閉じる' : '販売情報を見る'}
+                            {isSalesExpanded ? '販売情報を閉じる' : '販売情報を開く'}
                           </button>
                         )}
                         <button
@@ -1384,21 +1416,14 @@ function App() {
                           type="button"
                           onClick={() => toggleProductSection(product.id, 'detail')}
                         >
-                          {isDetailExpanded ? '詳細を閉じる' : '詳細を見る'}
+                          {isDetailExpanded ? '商品詳細を閉じる' : '商品詳細を開く'}
                         </button>
                         <button
-                          className="edit-product-button"
+                          className="collapse-section-button"
                           type="button"
-                          onClick={() => handleEditProduct(product)}
+                          onClick={() => toggleProductSection(product.id, 'actions')}
                         >
-                          編集
-                        </button>
-                        <button
-                          className="delete-product-button"
-                          type="button"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          削除
+                          {isActionsExpanded ? '操作を閉じる' : '操作を開く'}
                         </button>
                       </div>
                     </article>
