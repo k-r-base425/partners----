@@ -36,7 +36,6 @@ type Product = {
   code: string
   name: string
   category: ProductCategory
-  size: string
   startPrice: number
   targetPrice: number
   internalLowestPrice: number
@@ -153,7 +152,6 @@ const productCategories: { value: ProductCategory; label: string }[] = [
   { value: 'longSleeve', label: '長袖バンドT' },
 ]
 
-const productSizes = ['S', 'M', 'L', 'XL', 'XXL', 'その他']
 const productStatuses: ProductStatus[] = ['販売中', '売却済み', '請求待ち', '請求済み', '返却済み', '保留']
 const productStorageKey = 'offroad_partner_products'
 const productSequenceStorageKey = 'offroad_partner_product_next_number'
@@ -186,8 +184,6 @@ const getProductCodeNumber = (code: string) => {
 const getTodayString = () => new Date().toISOString().slice(0, 10)
 const getChannelLabel = (channelId: SalesChannelId) =>
   salesChannels.find((channel) => channel.id === channelId)?.label ?? channelId
-const getProductThumbnail = (category: ProductCategory) =>
-  category === 'longSleeve' ? '🧥' : '👕'
 const getDefaultFeeRatePercent = (channelId: SalesChannelId) => {
   const channel = salesChannels.find((item) => item.id === channelId) ?? salesChannels[0]
   return String(channel.feeRate * 100)
@@ -198,7 +194,6 @@ const getCalculationProductType = (category: ProductCategory): ProductTypeId =>
 const createInitialProductForm = (): ProductFormState => ({
   name: '',
   category: 'shortSleeve',
-  size: 'M',
   startPrice: '',
   targetPrice: '',
   internalLowestPrice: '',
@@ -308,7 +303,6 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     code,
     name: source.name,
     category,
-    size: typeof source.size === 'string' && source.size ? source.size : 'M',
     startPrice,
     targetPrice,
     internalLowestPrice,
@@ -542,7 +536,6 @@ function App() {
     const productValues = {
       name: productForm.name.trim(),
       category: productForm.category,
-      size: productForm.size,
       ...getProductPriceValues(productForm),
       listingDate: productForm.listingDate,
       status: productForm.status,
@@ -577,7 +570,6 @@ function App() {
     setProductForm({
       name: product.name,
       category: product.category,
-      size: product.size,
       startPrice: product.startPrice ? String(product.startPrice) : '',
       targetPrice: product.targetPrice ? String(product.targetPrice) : '',
       internalLowestPrice: product.internalLowestPrice ? String(product.internalLowestPrice) : '',
@@ -891,20 +883,6 @@ function App() {
             </label>
 
             <label className="field-group">
-              <span>サイズ</span>
-              <select
-                value={productForm.size}
-                onChange={(event) => updateProductForm('size', event.target.value)}
-              >
-                {productSizes.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field-group">
               <span>出品開始価格</span>
               <small>最初に出品する価格</small>
               <div className="input-with-unit">
@@ -1055,10 +1033,6 @@ function App() {
                   return (
                     <article className="product-card" key={product.id}>
                       <div className="product-card-main">
-                        <div className="product-thumb" aria-hidden="true">
-                          <span>{getProductThumbnail(product.category)}</span>
-                        </div>
-
                         <div className="product-summary">
                           <div className="product-meta-row">
                             <span className="product-date">
@@ -1073,9 +1047,7 @@ function App() {
 
                           <h4 className="product-title">{product.name}</h4>
                           <p className="product-code">{product.code || '商品番号なし'}</p>
-                          <p className="product-category-line">
-                            {getCategoryLabel(product.category)} / {product.size}
-                          </p>
+                          <p className="product-category-line">{getCategoryLabel(product.category)}</p>
 
                           <div className="product-metrics">
                             {isSold ? (
@@ -1137,10 +1109,6 @@ function App() {
                               <div className="detail-box">
                                 <span>商品種別</span>
                                 <strong>{getCategoryLabel(product.category)}</strong>
-                              </div>
-                              <div className="detail-box">
-                                <span>サイズ</span>
-                                <strong>{product.size}</strong>
                               </div>
                               <div className="detail-box">
                                 <span>出品開始価格</span>

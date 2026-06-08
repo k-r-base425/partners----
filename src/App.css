@@ -558,25 +558,8 @@
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: 76px minmax(0, 1fr) 58px;
+  grid-template-columns: minmax(0, 1fr) 58px;
   min-width: 0;
-}
-
-.product-thumb {
-  align-items: center;
-  aspect-ratio: 1;
-  background: #eef5ff;
-  border: 1px solid #d7e7f7;
-  border-radius: 10px;
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.product-thumb span {
-  font-size: 30px;
-  line-height: 1;
 }
 
 .product-summary {
@@ -654,7 +637,7 @@
 .product-metrics {
   display: grid;
   gap: 4px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: 0;
 }
 
@@ -680,12 +663,10 @@
 .metric-item strong {
   color: #172033;
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   line-height: 1.25;
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

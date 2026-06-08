@@ -1,0 +1,48 @@
+- generic [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - paragraph [ref=e7]: Self Compass
+        - heading "今日の状態を、短く残す" [level=1] [ref=e8]
+      - generic [ref=e9]: このアプリは診断・治療・服薬指示を行いません。医療機関や専門家への相談の代わりにはなれません。
+      - generic [ref=e10]: スマホでは、ブラウザの共有ボタンから「ホーム画面に追加」を選ぶと、アプリのように起動できます。
+      - generic [ref=e11]:
+        - generic [ref=e12]:
+          - paragraph [ref=e13]: 今日の記録
+          - heading "まだ未記録" [level=2] [ref=e14]
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: 気分
+            - strong [ref=e18]: "-"
+          - generic [ref=e19]:
+            - generic [ref=e20]: 不安
+            - strong [ref=e21]: "-"
+          - generic [ref=e22]:
+            - generic [ref=e23]: 睡眠
+            - strong [ref=e24]: "-"
+      - generic [ref=e25]:
+        - button "突発ログを記録" [ref=e26] [cursor=pointer]
+        - button "今日の記録をする" [ref=e27] [cursor=pointer]
+        - button "データ管理" [ref=e28] [cursor=pointer]
+      - generic [ref=e29]:
+        - heading "直近7日間" [level=2] [ref=e30]
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - generic [ref=e33]: 記録日数
+            - strong [ref=e34]: 0日
+          - generic [ref=e35]:
+            - generic [ref=e36]: 平均気分
+            - strong [ref=e37]: "-"
+          - generic [ref=e38]:
+            - generic [ref=e39]: 平均不安
+            - strong [ref=e40]: "-"
+          - generic [ref=e41]:
+            - generic [ref=e42]: 突発ログ
+            - strong [ref=e43]: 0件
+  - navigation "主要ナビゲーション" [ref=e44]:
+    - button "ホーム" [ref=e45] [cursor=pointer]
+    - button "今日の記録" [ref=e46] [cursor=pointer]
+    - button "突発ログ" [ref=e47] [cursor=pointer]
+    - button "記録一覧" [ref=e48] [cursor=pointer]
+    - button "分析" [ref=e49] [cursor=pointer]
+    - button "レポート" [ref=e50] [cursor=pointer]

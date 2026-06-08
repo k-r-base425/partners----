@@ -1,0 +1,96 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "販売委託管理アプリ" [level=1] [ref=e6]
+      - paragraph [ref=e7]: 古着販売パートナー向け管理ツール
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: 現在の画面
+        - heading "商品" [level=2] [ref=e69]
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - heading "商品登録" [level=3] [ref=e72]
+          - generic [ref=e73]:
+            - generic [ref=e74]: 商品名
+            - textbox "商品名" [ref=e75]:
+              - /placeholder: 例：Nirvana バンドT
+          - generic [ref=e76]:
+            - generic [ref=e77]: 商品種別
+            - combobox "商品種別" [ref=e78]:
+              - option "半袖バンドT" [selected]
+              - option "長袖バンドT"
+          - generic [ref=e79]:
+            - generic [ref=e80]: 出品開始価格
+            - generic [ref=e81]: 最初に出品する価格
+            - generic [ref=e82]:
+              - spinbutton "出品開始価格 最初に出品する価格 円" [ref=e83]
+              - generic [ref=e84]: 円
+          - generic [ref=e85]:
+            - generic [ref=e86]: 売りたい価格
+            - generic [ref=e87]: 値下げ後にこの価格へ戻します
+            - generic [ref=e88]:
+              - spinbutton "売りたい価格 値下げ後にこの価格へ戻します 円" [ref=e89]
+              - generic [ref=e90]: 円
+          - generic [ref=e91]:
+            - generic [ref=e92]: 内部最低価格
+            - generic [ref=e93]: 過去に一度でも到達した最安値
+            - generic [ref=e94]:
+              - spinbutton "内部最低価格 過去に一度でも到達した最安値 円" [ref=e95]
+              - generic [ref=e96]: 円
+          - generic [ref=e97]:
+            - generic [ref=e98]: 出品日
+            - textbox "出品日" [ref=e99]
+          - generic [ref=e100]:
+            - generic [ref=e101]: ステータス
+            - combobox "ステータス" [ref=e102]:
+              - option "販売中" [selected]
+              - option "売却済み"
+              - option "請求待ち"
+              - option "請求済み"
+              - option "返却済み"
+              - option "保留"
+          - generic [ref=e103]:
+            - generic [ref=e104]: メモ
+            - textbox "メモ" [ref=e105]:
+              - /placeholder: 販売時の注意点・補足など
+          - button "商品を登録する" [ref=e106] [cursor=pointer]
+        - region "登録済み商品一覧" [ref=e107]:
+          - heading "登録済み商品一覧" [level=3] [ref=e108]
+          - generic [ref=e109]:
+            - generic [ref=e110]:
+              - generic [ref=e111]: 登録商品：0件
+              - generic [ref=e112]: 表示中：0件
+            - generic [ref=e113]:
+              - generic [ref=e114]: ステータスで絞り込み
+              - combobox "ステータスで絞り込み" [ref=e115]:
+                - option "すべて" [selected]
+                - option "販売中"
+                - option "売却済み"
+                - option "請求待ち"
+                - option "請求済み"
+                - option "返却済み"
+                - option "保留"
+            - generic [ref=e116]:
+              - generic [ref=e117]: 商品種別で絞り込み
+              - combobox "商品種別で絞り込み" [ref=e118]:
+                - option "すべて" [selected]
+                - option "半袖バンドT"
+                - option "長袖バンドT"
+          - paragraph [ref=e119]: まだ登録された商品はありません
+  - navigation "下部メニュー" [ref=e53]:
+    - button "ホーム" [ref=e54] [cursor=pointer]:
+      - generic [ref=e55]: 🏠
+      - generic [ref=e56]: ホーム
+    - button "計算" [ref=e57] [cursor=pointer]:
+      - generic [ref=e58]: 🧮
+      - generic [ref=e59]: 計算
+    - button "商品" [active] [ref=e60] [cursor=pointer]:
+      - generic [ref=e61]: 👕
+      - generic [ref=e62]: 商品
+    - button "請求" [ref=e63] [cursor=pointer]:
+      - generic [ref=e64]: 💰
+      - generic [ref=e65]: 請求
+    - button "実績" [ref=e66] [cursor=pointer]:
+      - generic [ref=e67]: 📊
+      - generic [ref=e68]: 実績
