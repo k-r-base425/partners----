@@ -92,6 +92,15 @@ type SaleFormState = {
   feeRate: string
 }
 
+type ExpandedSections = Record<
+  string,
+  {
+    discount?: boolean
+    sales?: boolean
+    detail?: boolean
+  }
+>
+
 type StatusFilter = ProductStatus | 'すべて'
 type CategoryFilter = ProductCategory | 'すべて'
 type LegacyProductFields = {
@@ -160,6 +169,10 @@ const toNonNegativeNumber = (value: string) => Math.max(0, toNumber(value))
 const toStoredNonNegativeNumber = (value: unknown, fallback = 0) => {
   const numericValue = Number(value)
   return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : fallback
+}
+const toStoredNumber = (value: unknown, fallback = 0) => {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
 }
 const clampFeeRatePercent = (value: number) => Math.min(100, Math.max(0, value))
 const getCategoryLabel = (category: ProductCategory) =>
@@ -243,7 +256,7 @@ const calculatePriceDropInfo = (
     nextDiscountPrice,
     isRelistRecommended,
     operationStatus: isRelistRecommended ? '再出品推奨' : '継続運用',
-    returnPriceMessage: `値下げ後はすぐに${formatYen(targetPrice)}へ戻してください`,
+    returnPriceMessage: `割引後はすぐに${formatYen(targetPrice)}へ戻してください`,
   }
 }
 
@@ -319,9 +332,9 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     sellerProfit:
       source.sellerProfit === undefined
         ? undefined
-        : toStoredNonNegativeNumber(source.sellerProfit),
+        : toStoredNumber(source.sellerProfit),
     profitRate:
-      source.profitRate === undefined ? undefined : toStoredNonNegativeNumber(source.profitRate),
+      source.profitRate === undefined ? undefined : toStoredNumber(source.profitRate),
   }
 }
 
@@ -374,6 +387,7 @@ function App() {
   const [saleForm, setSaleForm] = useState<SaleFormState>(() => createSaleForm())
   const [saleError, setSaleError] = useState('')
   const [saleMessage, setSaleMessage] = useState('')
+  const [expandedSections, setExpandedSections] = useState<ExpandedSections>({})
   const productFormRef = useRef<HTMLFormElement | null>(null)
 
   const feeRatePercent = clampFeeRatePercent(toNumber(feeRateInput))
@@ -471,6 +485,24 @@ function App() {
     setSaleForm((current) => ({ ...current, [key]: value }))
     setSaleError('')
     setSaleMessage('')
+  }
+
+  const isSectionExpanded = (
+    productId: string,
+    section: keyof ExpandedSections[string],
+  ) => Boolean(expandedSections[productId]?.[section])
+
+  const toggleProductSection = (
+    productId: string,
+    section: keyof ExpandedSections[string],
+  ) => {
+    setExpandedSections((current) => ({
+      ...current,
+      [productId]: {
+        ...current[productId],
+        [section]: !current[productId]?.[section],
+      },
+    }))
   }
 
   const handleSalesChannelChange = (value: SalesChannelId) => {
@@ -632,6 +664,11 @@ function App() {
     if (activeSaleProductId === productId) {
       handleCancelSaleForm()
     }
+    setExpandedSections((current) => {
+      const nextSections = { ...current }
+      delete nextSections[productId]
+      return nextSections
+    })
     setProductMessage('商品を削除しました。')
     setProductError('')
   }
@@ -1002,6 +1039,9 @@ function App() {
               <div className="product-card-list">
                 {filteredProducts.map((product) => {
                   const priceDropInfo = calculatePriceDropInfo(product)
+                  const isDiscountExpanded = isSectionExpanded(product.id, 'discount')
+                  const isSalesExpanded = isSectionExpanded(product.id, 'sales')
+                  const isDetailExpanded = isSectionExpanded(product.id, 'detail')
 
                   return (
                     <article className="product-card" key={product.id}>
@@ -1040,68 +1080,87 @@ function App() {
                         </div>
                       </dl>
 
-                      <section className="price-drop-section" aria-label="値下げ運用">
-                        <div className="price-drop-heading">
-                          <h5>値下げ運用</h5>
-                          {priceDropInfo.hasInternalLowestPrice && (
-                            <span
-                              className={
-                                priceDropInfo.isRelistRecommended
-                                  ? 'operation-badge relist'
-                                  : 'operation-badge'
-                              }
-                            >
-                              {priceDropInfo.operationStatus}
-                            </span>
-                          )}
-                        </div>
+                      {isDiscountExpanded && (
+                        <section className="price-drop-section" aria-label="値下げ運用">
+                          <div className="price-drop-heading">
+                            <h5>値下げ運用</h5>
+                            {priceDropInfo.hasInternalLowestPrice && (
+                              <span
+                                className={
+                                  priceDropInfo.isRelistRecommended
+                                    ? 'operation-badge relist'
+                                    : 'operation-badge'
+                                }
+                              >
+                                {priceDropInfo.operationStatus}
+                              </span>
+                            )}
+                          </div>
 
-                        {!priceDropInfo.hasInternalLowestPrice ? (
-                          <p className="price-drop-guidance">{priceDropInfo.guidance}</p>
-                        ) : (
-                          <>
-                            <dl className="price-drop-list">
-                              <div>
-                                <dt>内部最低価格</dt>
-                                <dd>{formatYen(product.internalLowestPrice)}</dd>
-                              </div>
-                              <div>
-                                <dt>次回値下げ額</dt>
-                                <dd>{formatYen(priceDropInfo.nextDiscountAmount)}</dd>
-                              </div>
-                              <div>
-                                <dt>次回値下げ後価格</dt>
-                                <dd>{formatYen(priceDropInfo.nextDiscountPrice)}</dd>
-                              </div>
-                              <div>
-                                <dt>売りたい価格</dt>
-                                <dd>{formatYen(product.targetPrice)}</dd>
-                              </div>
-                              <div>
-                                <dt>運用判定</dt>
-                                <dd>{priceDropInfo.operationStatus}</dd>
-                              </div>
-                            </dl>
-                            <p className="price-drop-rounding">
-                              次回値下げ額は50円単位で切り上げています
-                            </p>
-                            <p className="price-drop-frequency">値下げ頻度目安：2日に1回推奨</p>
-                            <p
-                              className={
-                                priceDropInfo.isRelistRecommended
-                                  ? 'price-drop-return caution'
-                                  : 'price-drop-return'
-                              }
-                            >
-                              注意：{priceDropInfo.returnPriceMessage}
-                            </p>
-                          </>
-                        )}
-                      </section>
+                          {!priceDropInfo.hasInternalLowestPrice ? (
+                            <p className="price-drop-guidance">{priceDropInfo.guidance}</p>
+                          ) : (
+                            <>
+                              <dl className="price-drop-list">
+                                <div>
+                                  <dt>内部最低価格</dt>
+                                  <dd>{formatYen(product.internalLowestPrice)}</dd>
+                                </div>
+                                <div>
+                                  <dt>次回減額</dt>
+                                  <dd>{formatYen(priceDropInfo.nextDiscountAmount)}</dd>
+                                </div>
+                                <div>
+                                  <dt>次回値下げ後価格</dt>
+                                  <dd>{formatYen(priceDropInfo.nextDiscountPrice)}</dd>
+                                </div>
+                                <div>
+                                  <dt>売りたい価格</dt>
+                                  <dd>{formatYen(product.targetPrice)}</dd>
+                                </div>
+                                <div>
+                                  <dt>運用判定</dt>
+                                  <dd>{priceDropInfo.operationStatus}</dd>
+                                </div>
+                              </dl>
+                              <p className="price-drop-rounding">
+                                次回の減額額は50円単位で切り上げています
+                              </p>
+                              <p className="price-drop-frequency">割引頻度目安：2日に1回推奨</p>
+                              <p
+                                className={
+                                  priceDropInfo.isRelistRecommended
+                                    ? 'price-drop-return caution'
+                                    : 'price-drop-return'
+                                }
+                              >
+                                注意：{priceDropInfo.returnPriceMessage}
+                              </p>
+                            </>
+                          )}
+                        </section>
+                      )}
 
                       {product.soldPrice !== undefined && (
-                        <section className="sale-info-section" aria-label="売却情報">
-                          <h5>売却情報</h5>
+                        <dl className="sale-summary-list" aria-label="売却サマリー">
+                          <div>
+                            <dt>販売価格</dt>
+                            <dd>{formatYen(product.soldPrice)}</dd>
+                          </div>
+                          <div>
+                            <dt>請求額</dt>
+                            <dd>{formatYen(product.billingAmount ?? 0)}</dd>
+                          </div>
+                          <div>
+                            <dt>販売者利益</dt>
+                            <dd>{formatYen(product.sellerProfit ?? 0)}</dd>
+                          </div>
+                        </dl>
+                      )}
+
+                      {product.soldPrice !== undefined && isSalesExpanded && (
+                        <section className="sale-info-section" aria-label="販売情報">
+                          <h5>販売情報</h5>
                           <dl className="sale-info-list">
                             <div>
                               <dt>販売日</dt>
@@ -1109,7 +1168,9 @@ function App() {
                             </div>
                             <div>
                               <dt>販売先</dt>
-                              <dd>{product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}</dd>
+                              <dd>
+                                {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
+                              </dd>
                             </div>
                             <div>
                               <dt>販売価格</dt>
@@ -1283,7 +1344,16 @@ function App() {
                         </section>
                       )}
 
-                      {product.memo && <p className="product-memo">{product.memo}</p>}
+                      {isDetailExpanded && (
+                        <section className="product-detail-section" aria-label="詳細情報">
+                          <h5>詳細情報</h5>
+                          {product.memo ? (
+                            <p className="product-memo">{product.memo}</p>
+                          ) : (
+                            <p className="product-memo empty">メモはありません</p>
+                          )}
+                        </section>
+                      )}
 
                       <div className="product-card-actions">
                         <button
@@ -1292,6 +1362,29 @@ function App() {
                           onClick={() => handleOpenSaleForm(product)}
                         >
                           {product.soldPrice !== undefined ? '売却情報を編集' : '売却登録'}
+                        </button>
+                        <button
+                          className="collapse-section-button"
+                          type="button"
+                          onClick={() => toggleProductSection(product.id, 'discount')}
+                        >
+                          {isDiscountExpanded ? '値下げ運用を閉じる' : '値下げ運用を見る'}
+                        </button>
+                        {product.soldPrice !== undefined && (
+                          <button
+                            className="collapse-section-button"
+                            type="button"
+                            onClick={() => toggleProductSection(product.id, 'sales')}
+                          >
+                            {isSalesExpanded ? '販売情報を閉じる' : '販売情報を見る'}
+                          </button>
+                        )}
+                        <button
+                          className="collapse-section-button"
+                          type="button"
+                          onClick={() => toggleProductSection(product.id, 'detail')}
+                        >
+                          {isDetailExpanded ? '詳細を閉じる' : '詳細を見る'}
                         </button>
                         <button
                           className="edit-product-button"
