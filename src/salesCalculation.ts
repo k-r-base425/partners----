@@ -1,6 +1,6 @@
 export const salesChannels = [
   { id: 'mercari', label: 'メルカリ', feeRate: 0.1 },
-  { id: 'yahoo-fleamarket', label: 'ヤフーフリマ', feeRate: 0.1 },
+  { id: 'yahoo-fleamarket', label: 'ヤフーフリマ', feeRate: 0.05 },
 ] as const
 
 export const productTypes = [
@@ -16,6 +16,7 @@ export type SalesCalculationInput = {
   productType: ProductTypeId
   salePrice: number
   shippingFee: number
+  feeRate?: number
 }
 
 export type SalesCalculationResult = {
@@ -47,16 +48,18 @@ export function calculateSalesResult({
   productType,
   salePrice,
   shippingFee,
+  feeRate,
 }: SalesCalculationInput): SalesCalculationResult {
   const normalizedSalePrice = Math.max(0, toYen(salePrice))
   const normalizedShippingFee = Math.max(0, toYen(shippingFee))
   const channel = findSalesChannel(salesChannel)
+  const normalizedFeeRate = Math.min(1, Math.max(0, feeRate ?? channel.feeRate))
   const selectedProductType = findProductType(productType)
 
   if (normalizedSalePrice <= 0) {
     return {
       salePrice: 0,
-      feeRate: channel.feeRate,
+      feeRate: normalizedFeeRate,
       salesFee: 0,
       priceAfterFee: 0,
       baseCharge: 0,
@@ -71,7 +74,7 @@ export function calculateSalesResult({
     }
   }
 
-  const salesFee = toYen(normalizedSalePrice * channel.feeRate)
+  const salesFee = toYen(normalizedSalePrice * normalizedFeeRate)
   const priceAfterFee = normalizedSalePrice - salesFee
   const baseCharge = priceAfterFee * 0.5
   const minimumCharge = selectedProductType.minimumCharge
@@ -85,7 +88,7 @@ export function calculateSalesResult({
 
   return {
     salePrice: normalizedSalePrice,
-    feeRate: channel.feeRate,
+    feeRate: normalizedFeeRate,
     salesFee,
     priceAfterFee,
     baseCharge,
