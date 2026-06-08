@@ -183,7 +183,13 @@ const getProductCodeNumber = (code: string) => {
   const match = code.match(/^BT-(\d+)$/)
   return match ? Number(match[1]) : 0
 }
-const getTodayString = () => new Date().toISOString().slice(0, 10)
+const getTodayString = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 const getChannelLabel = (channelId: SalesChannelId) =>
   salesChannels.find((channel) => channel.id === channelId)?.label ?? channelId
 const getDefaultFeeRatePercent = (channelId: SalesChannelId) => {
@@ -786,7 +792,7 @@ function App() {
           <span>販売価格</span>
           <strong>{formatYen(product.soldPrice ?? 0)}</strong>
         </div>
-        <div>
+        <div className="billing-amount-highlight">
           <span>請求額</span>
           <strong>{formatYen(product.billingAmount ?? 0)}</strong>
         </div>

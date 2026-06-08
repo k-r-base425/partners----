@@ -1357,6 +1357,15 @@
   white-space: nowrap;
 }
 
+.billing-product-amounts .billing-amount-highlight {
+  background: #eef5ff;
+  border-color: #cfe1f8;
+}
+
+.billing-product-amounts .billing-amount-highlight strong {
+  color: #1f5f9f;
+}
+
 .billing-primary-button,
 .billing-secondary-button,
 .billing-toggle-button {
