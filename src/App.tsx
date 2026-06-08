@@ -46,6 +46,20 @@ type Product = {
   createdAt: string
 }
 
+type PriceDropInfo =
+  | {
+      hasInternalLowestPrice: false
+      guidance: string
+    }
+  | {
+      hasInternalLowestPrice: true
+      nextDiscountAmount: number
+      nextDiscountPrice: number
+      isRelistRecommended: boolean
+      operationStatus: '再出品推奨' | '継続運用'
+      returnPriceMessage: string
+    }
+
 type ProductFormState = Omit<
   Product,
   | 'id'
@@ -164,6 +178,33 @@ const getProductPriceValues = (form: ProductFormState) => {
       form.internalLowestPrice.trim() === '' && shouldUseStartPrice
         ? startPrice
         : toNonNegativeNumber(form.internalLowestPrice),
+  }
+}
+
+const calculatePriceDropInfo = (
+  product: Pick<Product, 'internalLowestPrice' | 'targetPrice'>,
+): PriceDropInfo => {
+  const internalLowestPrice = Math.max(0, Math.round(product.internalLowestPrice))
+  const targetPrice = Math.max(0, Math.round(product.targetPrice))
+
+  if (internalLowestPrice <= 0) {
+    return {
+      hasInternalLowestPrice: false,
+      guidance: '内部最低価格を入力すると、次回値下げ目安が表示されます。',
+    }
+  }
+
+  const nextDiscountAmount = Math.ceil(Math.max(internalLowestPrice * 0.05, 100))
+  const nextDiscountPrice = Math.max(internalLowestPrice - nextDiscountAmount, 0)
+  const isRelistRecommended = internalLowestPrice <= 300
+
+  return {
+    hasInternalLowestPrice: true,
+    nextDiscountAmount,
+    nextDiscountPrice,
+    isRelistRecommended,
+    operationStatus: isRelistRecommended ? '再出品推奨' : '継続運用',
+    returnPriceMessage: `値下げ後はすぐに${formatYen(targetPrice)}へ戻してください`,
   }
 }
 
@@ -787,63 +828,123 @@ function App() {
               <p className="empty-list-message">該当する商品はありません</p>
             ) : (
               <div className="product-card-list">
-                {filteredProducts.map((product) => (
-                  <article className="product-card" key={product.id}>
-                    <div className="product-card-header">
-                      <div>
-                        <h4>{product.name}</h4>
-                        <p>{product.code || '商品番号なし'}</p>
-                      </div>
-                      <span className="status-badge">{product.status}</span>
-                    </div>
+                {filteredProducts.map((product) => {
+                  const priceDropInfo = calculatePriceDropInfo(product)
 
-                    <dl className="product-detail-list">
-                      <div>
-                        <dt>商品種別</dt>
-                        <dd>{getCategoryLabel(product.category)}</dd>
+                  return (
+                    <article className="product-card" key={product.id}>
+                      <div className="product-card-header">
+                        <div>
+                          <h4>{product.name}</h4>
+                          <p>{product.code || '商品番号なし'}</p>
+                        </div>
+                        <span className="status-badge">{product.status}</span>
                       </div>
-                      <div>
-                        <dt>サイズ</dt>
-                        <dd>{product.size}</dd>
-                      </div>
-                      <div>
-                        <dt>出品開始価格</dt>
-                        <dd>{formatYen(product.startPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>売りたい価格</dt>
-                        <dd>{formatYen(product.targetPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>内部最低価格</dt>
-                        <dd>{formatYen(product.internalLowestPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>出品日</dt>
-                        <dd>{product.listingDate || '未出品'}</dd>
-                      </div>
-                    </dl>
 
-                    {product.memo && <p className="product-memo">{product.memo}</p>}
+                      <dl className="product-detail-list">
+                        <div>
+                          <dt>商品種別</dt>
+                          <dd>{getCategoryLabel(product.category)}</dd>
+                        </div>
+                        <div>
+                          <dt>サイズ</dt>
+                          <dd>{product.size}</dd>
+                        </div>
+                        <div>
+                          <dt>出品開始価格</dt>
+                          <dd>{formatYen(product.startPrice)}</dd>
+                        </div>
+                        <div>
+                          <dt>売りたい価格</dt>
+                          <dd>{formatYen(product.targetPrice)}</dd>
+                        </div>
+                        <div>
+                          <dt>内部最低価格</dt>
+                          <dd>{formatYen(product.internalLowestPrice)}</dd>
+                        </div>
+                        <div>
+                          <dt>出品日</dt>
+                          <dd>{product.listingDate || '未出品'}</dd>
+                        </div>
+                      </dl>
 
-                    <div className="product-card-actions">
-                      <button
-                        className="edit-product-button"
-                        type="button"
-                        onClick={() => handleEditProduct(product)}
-                      >
-                        編集
-                      </button>
-                      <button
-                        className="delete-product-button"
-                        type="button"
-                        onClick={() => handleDeleteProduct(product.id)}
-                      >
-                        削除
-                      </button>
-                    </div>
-                  </article>
-                ))}
+                      <section className="price-drop-section" aria-label="値下げ運用">
+                        <div className="price-drop-heading">
+                          <h5>値下げ運用</h5>
+                          {priceDropInfo.hasInternalLowestPrice && (
+                            <span
+                              className={
+                                priceDropInfo.isRelistRecommended
+                                  ? 'operation-badge relist'
+                                  : 'operation-badge'
+                              }
+                            >
+                              {priceDropInfo.operationStatus}
+                            </span>
+                          )}
+                        </div>
+
+                        {!priceDropInfo.hasInternalLowestPrice ? (
+                          <p className="price-drop-guidance">{priceDropInfo.guidance}</p>
+                        ) : (
+                          <>
+                            <dl className="price-drop-list">
+                              <div>
+                                <dt>内部最低価格</dt>
+                                <dd>{formatYen(product.internalLowestPrice)}</dd>
+                              </div>
+                              <div>
+                                <dt>次回値下げ額</dt>
+                                <dd>{formatYen(priceDropInfo.nextDiscountAmount)}</dd>
+                              </div>
+                              <div>
+                                <dt>次回値下げ後価格</dt>
+                                <dd>{formatYen(priceDropInfo.nextDiscountPrice)}</dd>
+                              </div>
+                              <div>
+                                <dt>売りたい価格</dt>
+                                <dd>{formatYen(product.targetPrice)}</dd>
+                              </div>
+                              <div>
+                                <dt>運用判定</dt>
+                                <dd>{priceDropInfo.operationStatus}</dd>
+                              </div>
+                            </dl>
+                            <p className="price-drop-frequency">値下げ頻度目安：2日に1回推奨</p>
+                            <p
+                              className={
+                                priceDropInfo.isRelistRecommended
+                                  ? 'price-drop-return caution'
+                                  : 'price-drop-return'
+                              }
+                            >
+                              注意：{priceDropInfo.returnPriceMessage}
+                            </p>
+                          </>
+                        )}
+                      </section>
+
+                      {product.memo && <p className="product-memo">{product.memo}</p>}
+
+                      <div className="product-card-actions">
+                        <button
+                          className="edit-product-button"
+                          type="button"
+                          onClick={() => handleEditProduct(product)}
+                        >
+                          編集
+                        </button>
+                        <button
+                          className="delete-product-button"
+                          type="button"
+                          onClick={() => handleDeleteProduct(product.id)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
               </div>
             )}
           </section>
