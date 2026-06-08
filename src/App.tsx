@@ -38,7 +38,6 @@ type Product = {
   category: ProductCategory
   size: string
   startPrice: number
-  currentPrice: number
   targetPrice: number
   internalLowestPrice: number
   listingDate: string
@@ -53,12 +52,10 @@ type ProductFormState = Omit<
   | 'code'
   | 'createdAt'
   | 'startPrice'
-  | 'currentPrice'
   | 'targetPrice'
   | 'internalLowestPrice'
 > & {
   startPrice: string
-  currentPrice: string
   targetPrice: string
   internalLowestPrice: string
 }
@@ -67,7 +64,6 @@ type StatusFilter = ProductStatus | 'すべて'
 type CategoryFilter = ProductCategory | 'すべて'
 type LegacyProductFields = {
   suggestedPrice?: unknown
-  minimumPrice?: unknown
 }
 
 const bottomNavItems: BottomNavItem[] = [
@@ -147,7 +143,6 @@ const createInitialProductForm = (): ProductFormState => ({
   category: 'shortSleeve',
   size: 'M',
   startPrice: '',
-  currentPrice: '',
   targetPrice: '',
   internalLowestPrice: '',
   listingDate: '',
@@ -161,10 +156,6 @@ const getProductPriceValues = (form: ProductFormState) => {
 
   return {
     startPrice,
-    currentPrice:
-      form.currentPrice.trim() === '' && shouldUseStartPrice
-        ? startPrice
-        : toNonNegativeNumber(form.currentPrice),
     targetPrice:
       form.targetPrice.trim() === '' && shouldUseStartPrice
         ? startPrice
@@ -203,10 +194,6 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
         : new Date().toISOString()
   const legacySuggestedPrice = toStoredNonNegativeNumber(source.suggestedPrice)
   const startPrice = toStoredNonNegativeNumber(source.startPrice, legacySuggestedPrice)
-  const currentPrice =
-    source.currentPrice === undefined
-      ? startPrice
-      : toStoredNonNegativeNumber(source.currentPrice, startPrice)
   const targetPrice =
     source.targetPrice === undefined
       ? startPrice
@@ -223,7 +210,6 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     category,
     size: typeof source.size === 'string' && source.size ? source.size : 'M',
     startPrice,
-    currentPrice,
     targetPrice,
     internalLowestPrice,
     listingDate: typeof source.listingDate === 'string' ? source.listingDate : '',
@@ -417,7 +403,6 @@ function App() {
       category: product.category,
       size: product.size,
       startPrice: product.startPrice ? String(product.startPrice) : '',
-      currentPrice: product.currentPrice ? String(product.currentPrice) : '',
       targetPrice: product.targetPrice ? String(product.targetPrice) : '',
       internalLowestPrice: product.internalLowestPrice ? String(product.internalLowestPrice) : '',
       listingDate: product.listingDate,
@@ -662,7 +647,7 @@ function App() {
 
             <label className="field-group">
               <span>出品開始価格</span>
-              <small>最初に出品を開始する価格</small>
+              <small>最初に出品する価格</small>
               <div className="input-with-unit">
                 <input
                   inputMode="numeric"
@@ -678,25 +663,8 @@ function App() {
             </label>
 
             <label className="field-group">
-              <span>現在表示価格</span>
-              <small>いま販売サイト上に表示されている価格</small>
-              <div className="input-with-unit">
-                <input
-                  inputMode="numeric"
-                  min="0"
-                  pattern="[0-9]*"
-                  placeholder="例：9800"
-                  type="number"
-                  value={productForm.currentPrice}
-                  onChange={(event) => updateProductForm('currentPrice', event.target.value)}
-                />
-                <span>円</span>
-              </div>
-            </label>
-
-            <label className="field-group">
               <span>売りたい価格</span>
-              <small>値下げ後に戻す、実際に売りたい価格</small>
+              <small>値下げ後に戻す価格・実際に売りたい価格</small>
               <div className="input-with-unit">
                 <input
                   inputMode="numeric"
@@ -713,7 +681,7 @@ function App() {
 
             <label className="field-group">
               <span>内部最低価格</span>
-              <small>過去に一度でも到達した最も安い価格</small>
+              <small>過去に一度でも到達した最安値</small>
               <div className="input-with-unit">
                 <input
                   inputMode="numeric"
@@ -841,10 +809,6 @@ function App() {
                       <div>
                         <dt>出品開始価格</dt>
                         <dd>{formatYen(product.startPrice)}</dd>
-                      </div>
-                      <div>
-                        <dt>現在表示価格</dt>
-                        <dd>{formatYen(product.currentPrice)}</dd>
                       </div>
                       <div>
                         <dt>売りたい価格</dt>
