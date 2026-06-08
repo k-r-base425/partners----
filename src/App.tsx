@@ -23,9 +23,9 @@ const dashboardCards = [
   { label: '売却済み', value: '0' },
   { label: '請求待ち', value: '0' },
   { label: '請求済み', value: '0' },
-  { label: '今月の販売額', value: '0円' },
-  { label: '今月の請求額', value: '0円' },
-  { label: '今月の利益', value: '0円' },
+  { label: '今月の販売額', value: '0円', variant: 'amount' },
+  { label: '今月の請求額', value: '0円', variant: 'amount' },
+  { label: '今月の利益', value: '0円', variant: 'amount' },
 ]
 
 const placeholderText: Record<string, string> = {
@@ -74,7 +74,14 @@ function App() {
           {activeMenu === 'dashboard' ? (
             <div className="dashboard-grid">
               {dashboardCards.map((card) => (
-                <article className="dashboard-card" key={card.label}>
+                <article
+                  className={
+                    card.variant === 'amount'
+                      ? 'dashboard-card dashboard-card-wide'
+                      : 'dashboard-card'
+                  }
+                  key={card.label}
+                >
                   <p>{card.label}</p>
                   <strong>{card.value}</strong>
                 </article>
