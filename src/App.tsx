@@ -664,7 +664,7 @@ function App() {
 
             <label className="field-group">
               <span>売りたい価格</span>
-              <small>値下げ後に戻す価格・実際に売りたい価格</small>
+              <small>値下げ後にこの価格へ戻します</small>
               <div className="input-with-unit">
                 <input
                   inputMode="numeric"
