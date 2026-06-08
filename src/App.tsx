@@ -194,7 +194,8 @@ const calculatePriceDropInfo = (
     }
   }
 
-  const nextDiscountAmount = Math.ceil(Math.max(internalLowestPrice * 0.05, 100))
+  const baseDiscount = Math.max(internalLowestPrice * 0.05, 100)
+  const nextDiscountAmount = Math.ceil(baseDiscount / 50) * 50
   const nextDiscountPrice = Math.max(internalLowestPrice - nextDiscountAmount, 0)
   const isRelistRecommended = internalLowestPrice <= 300
 
@@ -910,6 +911,9 @@ function App() {
                                 <dd>{priceDropInfo.operationStatus}</dd>
                               </div>
                             </dl>
+                            <p className="price-drop-rounding">
+                              次回値下げ額は50円単位で切り上げています
+                            </p>
                             <p className="price-drop-frequency">値下げ頻度目安：2日に1回推奨</p>
                             <p
                               className={

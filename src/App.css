@@ -679,6 +679,7 @@
   text-align: right;
 }
 
+.price-drop-rounding,
 .price-drop-frequency,
 .price-drop-return {
   border-radius: 10px;
@@ -688,6 +689,12 @@
   margin: 0;
   overflow-wrap: anywhere;
   padding: 10px;
+}
+
+.price-drop-rounding {
+  background: #eef5fd;
+  border: 1px solid #d7e7f7;
+  color: #1f5f9f;
 }
 
 .price-drop-frequency {
