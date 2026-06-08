@@ -204,6 +204,14 @@
   line-height: 1.35;
 }
 
+.field-group small {
+  color: #718197;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin-top: -2px;
+}
+
 .field-group select,
 .field-group input,
 .field-group textarea {
