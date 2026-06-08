@@ -1144,6 +1144,49 @@
   margin-top: 12px;
 }
 
+.product-reset-panel {
+  background: #fffafa;
+  border: 1px solid #f3d4d4;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.product-reset-panel strong {
+  color: #7f2d2d;
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  margin-bottom: 3px;
+}
+
+.product-reset-panel p {
+  color: #7a5660;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.reset-data-button {
+  appearance: none;
+  background: #ffffff;
+  border: 1px solid #e8b9b9;
+  border-radius: 10px;
+  color: #a3342a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  min-height: 44px;
+  padding: 10px 12px;
+  touch-action: manipulation;
+  width: 100%;
+}
+
 .billing-layout {
   display: grid;
   gap: 14px;

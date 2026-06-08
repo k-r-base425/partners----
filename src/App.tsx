@@ -154,8 +154,9 @@ const productCategories: { value: ProductCategory; label: string }[] = [
 ]
 
 const productStatuses: ProductStatus[] = ['販売中', '売却済み', '請求待ち', '請求済み', '返却済み', '保留']
-const productStorageKey = 'offroad_partner_products'
-const productSequenceStorageKey = 'offroad_partner_product_next_number'
+const productStorageKey = 'partners-sales-products'
+const legacyProductStorageKey = 'offroad_partner_products'
+const legacyProductSequenceStorageKey = 'offroad_partner_product_next_number'
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   maximumFractionDigits: 0,
@@ -343,7 +344,8 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
 
 const loadProducts = () => {
   try {
-    const storedProducts = localStorage.getItem(productStorageKey)
+    const storedProducts =
+      localStorage.getItem(productStorageKey) ?? localStorage.getItem(legacyProductStorageKey)
     if (!storedProducts) {
       return []
     }
@@ -362,13 +364,12 @@ const loadProducts = () => {
 }
 
 const getNextProductNumber = (products: Product[]) => {
-  const storedNextNumber = Number(localStorage.getItem(productSequenceStorageKey))
   const maxCodeNumber = products.reduce(
     (maxNumber, product) => Math.max(maxNumber, getProductCodeNumber(product.code)),
     0,
   )
 
-  return Math.max(Number.isFinite(storedNextNumber) ? storedNextNumber : 1, maxCodeNumber + 1)
+  return maxCodeNumber + 1
 }
 
 function App() {
@@ -382,7 +383,6 @@ function App() {
   const [productForm, setProductForm] = useState<ProductFormState>(() => createInitialProductForm())
   const [productError, setProductError] = useState('')
   const [productMessage, setProductMessage] = useState('')
-  const [nextProductNumber, setNextProductNumber] = useState(() => getNextProductNumber(loadProducts()))
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
@@ -394,6 +394,7 @@ function App() {
   const [isBilledListOpen, setIsBilledListOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>({})
   const productFormRef = useRef<HTMLFormElement | null>(null)
+  const shouldSkipNextProductSave = useRef(false)
 
   const feeRatePercent = clampFeeRatePercent(toNumber(feeRateInput))
   const salesResult = calculateSalesResult({
@@ -486,12 +487,16 @@ function App() {
   ]
 
   useEffect(() => {
+    if (shouldSkipNextProductSave.current) {
+      localStorage.removeItem(productStorageKey)
+      localStorage.removeItem(legacyProductStorageKey)
+      localStorage.removeItem(legacyProductSequenceStorageKey)
+      shouldSkipNextProductSave.current = false
+      return
+    }
+
     localStorage.setItem(productStorageKey, JSON.stringify(products))
   }, [products])
-
-  useEffect(() => {
-    localStorage.setItem(productSequenceStorageKey, String(nextProductNumber))
-  }, [nextProductNumber])
 
   const updateProductForm = <Key extends keyof ProductFormState>(
     key: Key,
@@ -577,15 +582,16 @@ function App() {
       )
       setProductMessage('商品を更新しました。')
     } else {
-      const newProduct: Product = {
-        id: `${Date.now()}`,
-        code: formatProductCode(nextProductNumber),
-        createdAt: new Date().toISOString(),
-        ...productValues,
-      }
+      setProducts((current) => {
+        const newProduct: Product = {
+          id: `${Date.now()}`,
+          code: formatProductCode(getNextProductNumber(current)),
+          createdAt: new Date().toISOString(),
+          ...productValues,
+        }
 
-      setProducts((current) => [newProduct, ...current])
-      setNextProductNumber((current) => current + 1)
+        return [newProduct, ...current]
+      })
       setProductMessage('商品を登録しました。')
     }
 
@@ -731,6 +737,25 @@ function App() {
     })
     setProductMessage('商品を削除しました。')
     setProductError('')
+  }
+
+  const handleResetSavedProducts = () => {
+    if (!window.confirm('すべての商品データを削除します。よろしいですか？')) {
+      return
+    }
+
+    shouldSkipNextProductSave.current = true
+    localStorage.removeItem(productStorageKey)
+    localStorage.removeItem(legacyProductStorageKey)
+    localStorage.removeItem(legacyProductSequenceStorageKey)
+    setProducts([])
+    resetProductForm()
+    handleCancelSaleForm()
+    setExpandedSections({})
+    setProductMessage('保存データをリセットしました。')
+    setProductError('')
+    setSaleMessage('')
+    setBillingMessage('')
   }
 
   const renderBillingProductCard = (product: Product, variant: 'pending' | 'billed') => (
@@ -1513,6 +1538,20 @@ function App() {
                 })}
               </div>
             )}
+
+            <div className="product-reset-panel">
+              <div>
+                <strong>保存データ</strong>
+                <p>試験使用中の商品データをすべて削除できます。</p>
+              </div>
+              <button
+                className="reset-data-button"
+                type="button"
+                onClick={handleResetSavedProducts}
+              >
+                保存データをリセット
+              </button>
+            </div>
           </section>
         </div>
       )
