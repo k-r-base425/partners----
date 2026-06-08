@@ -1,23 +1,44 @@
 import { useState } from 'react'
 import './App.css'
 
-type MenuItem = {
-  id: string
+type ScreenId = 'dashboard' | 'simulation' | 'products' | 'billing' | 'sales' | 'resources'
+
+type BottomNavItem = {
+  id: Exclude<ScreenId, 'resources'>
   label: string
+  icon: string
 }
 
-const menus: MenuItem[] = [
-  { id: 'dashboard', label: 'ダッシュボード' },
-  { id: 'simulation', label: '利益シミュレーション' },
-  { id: 'product-form', label: '商品登録' },
-  { id: 'product-list', label: '商品一覧' },
-  { id: 'billing', label: '請求管理' },
-  { id: 'sales', label: '販売実績' },
-  { id: 'rules', label: '販売ルール' },
-  { id: 'documents', label: '資料管理' },
+type DashboardCard = {
+  label: string
+  value: string
+  variant?: 'amount'
+}
+
+type ActionCard = {
+  label: string
+  description: string
+  target: ScreenId
+}
+
+const bottomNavItems: BottomNavItem[] = [
+  { id: 'dashboard', label: 'ホーム', icon: '🏠' },
+  { id: 'simulation', label: '計算', icon: '🧮' },
+  { id: 'products', label: '商品', icon: '👕' },
+  { id: 'billing', label: '請求', icon: '💰' },
+  { id: 'sales', label: '実績', icon: '📊' },
 ]
 
-const dashboardCards = [
+const screenLabels: Record<ScreenId, string> = {
+  dashboard: 'ホーム',
+  simulation: '利益シミュレーション',
+  products: '商品',
+  billing: '請求管理',
+  sales: '販売実績',
+  resources: 'ルール・資料',
+}
+
+const dashboardCards: DashboardCard[] = [
   { label: '登録商品数', value: '0' },
   { label: '販売中', value: '0' },
   { label: '売却済み', value: '0' },
@@ -28,19 +49,110 @@ const dashboardCards = [
   { label: '今月の利益', value: '0円', variant: 'amount' },
 ]
 
-const placeholderText: Record<string, string> = {
-  simulation: 'ここに販売利益シミュレーション機能を作成予定です',
-  'product-form': 'ここに商品登録機能を作成予定です',
-  'product-list': 'ここに商品一覧を表示予定です',
-  billing: 'ここに請求管理機能を作成予定です',
-  sales: 'ここに販売実績を表示予定です',
-  rules: 'ここに販売ルールを表示予定です',
-  documents: 'ここにPDF資料管理機能を作成予定です',
-}
+const quickActions: ActionCard[] = [
+  {
+    label: '利益を計算する',
+    description: '販売利益シミュレーションへ',
+    target: 'simulation',
+  },
+  {
+    label: '商品を登録する',
+    description: '商品登録・商品一覧へ',
+    target: 'products',
+  },
+  {
+    label: '請求を確認する',
+    description: '請求管理へ',
+    target: 'billing',
+  },
+  {
+    label: 'ルール・資料を見る',
+    description: '販売ルールとPDF資料の案内へ',
+    target: 'resources',
+  },
+]
 
 function App() {
-  const [activeMenu, setActiveMenu] = useState<MenuItem['id']>('dashboard')
-  const activeLabel = menus.find((menu) => menu.id === activeMenu)?.label
+  const [activeScreen, setActiveScreen] = useState<ScreenId>('dashboard')
+
+  const renderContent = () => {
+    if (activeScreen === 'dashboard') {
+      return (
+        <>
+          <div className="dashboard-grid">
+            {dashboardCards.map((card) => (
+              <article
+                className={
+                  card.variant === 'amount'
+                    ? 'dashboard-card dashboard-card-wide'
+                    : 'dashboard-card'
+                }
+                key={card.label}
+              >
+                <p>{card.label}</p>
+                <strong>{card.value}</strong>
+              </article>
+            ))}
+          </div>
+
+          <section className="quick-section" aria-labelledby="quick-actions-title">
+            <h3 id="quick-actions-title">クイック操作</h3>
+            <div className="quick-action-grid">
+              {quickActions.map((action) => (
+                <button
+                  className="quick-action-card"
+                  key={action.label}
+                  type="button"
+                  onClick={() => setActiveScreen(action.target)}
+                >
+                  <span>{action.label}</span>
+                  <small>{action.description}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
+      )
+    }
+
+    if (activeScreen === 'products') {
+      return (
+        <div className="feature-card-grid">
+          <article className="feature-card">
+            <p>商品登録機能を作成予定です</p>
+          </article>
+          <article className="feature-card">
+            <p>商品一覧を表示予定です</p>
+          </article>
+        </div>
+      )
+    }
+
+    if (activeScreen === 'resources') {
+      return (
+        <div className="feature-card-grid">
+          <article className="feature-card">
+            <p>販売ルールを表示予定です</p>
+          </article>
+          <article className="feature-card">
+            <p>PDF資料管理機能を作成予定です</p>
+          </article>
+        </div>
+      )
+    }
+
+    const placeholderText: Record<Exclude<ScreenId, 'dashboard' | 'products' | 'resources'>, string> = {
+      simulation: 'ここに販売利益シミュレーション機能を作成予定です',
+      billing: 'ここに請求管理機能を作成予定です',
+      sales: 'ここに販売実績を表示予定です',
+    }
+
+    return (
+      <div className="placeholder-panel">
+        <p>{placeholderText[activeScreen]}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="app-shell">
@@ -51,49 +163,33 @@ function App() {
         </div>
       </header>
 
-      <nav className="app-nav" aria-label="メインメニュー">
-        {menus.map((menu) => (
-          <button
-            key={menu.id}
-            type="button"
-            className={activeMenu === menu.id ? 'nav-button active' : 'nav-button'}
-            onClick={() => setActiveMenu(menu.id)}
-          >
-            {menu.label}
-          </button>
-        ))}
-      </nav>
-
       <main className="app-main">
         <section className="content-panel">
           <div className="section-heading">
             <span>現在の画面</span>
-            <h2>{activeLabel}</h2>
+            <h2>{screenLabels[activeScreen]}</h2>
           </div>
 
-          {activeMenu === 'dashboard' ? (
-            <div className="dashboard-grid">
-              {dashboardCards.map((card) => (
-                <article
-                  className={
-                    card.variant === 'amount'
-                      ? 'dashboard-card dashboard-card-wide'
-                      : 'dashboard-card'
-                  }
-                  key={card.label}
-                >
-                  <p>{card.label}</p>
-                  <strong>{card.value}</strong>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="placeholder-panel">
-              <p>{placeholderText[activeMenu]}</p>
-            </div>
-          )}
+          {renderContent()}
         </section>
       </main>
+
+      <nav className="bottom-nav" aria-label="下部メニュー">
+        {bottomNavItems.map((item) => (
+          <button
+            aria-current={activeScreen === item.id ? 'page' : undefined}
+            className={activeScreen === item.id ? 'bottom-nav-button active' : 'bottom-nav-button'}
+            key={item.id}
+            type="button"
+            onClick={() => setActiveScreen(item.id)}
+          >
+            <span className="bottom-nav-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span className="bottom-nav-label">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }
