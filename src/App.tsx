@@ -398,10 +398,34 @@ const getDefaultFeeRatePercent = (channelId: SalesChannelId) => {
 }
 const getCalculationProductType = (category: ProductCategory): ProductTypeId =>
   category === 'longSleeve' ? 'long-sleeve-band-t' : 'short-sleeve-band-t'
-const hasBillingData = (product: Product) =>
-  product.soldPrice !== undefined &&
-  product.billingAmount !== undefined &&
-  product.sellerProfit !== undefined
+const isSalesCompletedStatus = (status: ProductStatus) =>
+  status === '請求待ち' || status === '請求済み'
+const isSalesCompleted = (product: Product) => isSalesCompletedStatus(product.status)
+const hasStoredSalesInfo = (product: Product) =>
+  product.soldDate !== undefined ||
+  product.marketplace !== undefined ||
+  product.soldPrice !== undefined ||
+  product.shippingFee !== undefined ||
+  product.feeRate !== undefined ||
+  product.platformFee !== undefined ||
+  product.netSales !== undefined ||
+  product.billingAmount !== undefined ||
+  product.sellerProfit !== undefined ||
+  product.profitRate !== undefined ||
+  product.billedDate !== undefined
+const clearProductSalesInfo = (product: Product): Product => ({
+  id: product.id,
+  code: product.code,
+  name: product.name,
+  category: product.category,
+  startPrice: product.startPrice,
+  targetPrice: product.targetPrice,
+  internalLowestPrice: product.internalLowestPrice,
+  listingDate: product.listingDate,
+  status: product.status,
+  memo: product.memo,
+  createdAt: product.createdAt,
+})
 const getSoldMonthKey = (soldDate?: string) => {
   const match = soldDate?.match(/^(\d{4})-(\d{2})/)
   return match ? `${match[1]}-${match[2]}` : ''
@@ -495,27 +519,33 @@ const createProductsCsv = (items: Product[]) => {
     '精算済み日',
     'メモ',
   ]
-  const rows = items.map((product) => [
-    product.code,
-    product.name,
-    getCategoryLabel(product.category),
-    getProductStatusLabel(product.status),
-    product.startPrice,
-    product.internalLowestPrice,
-    product.listingDate,
-    product.soldDate ?? '',
-    product.marketplace ? getChannelLabel(product.marketplace) : '',
-    product.soldPrice ?? '',
-    product.shippingFee ?? '',
-    product.feeRate !== undefined ? formatFeeRate(product.feeRate) : '',
-    product.platformFee ?? '',
-    product.netSales ?? '',
-    product.billingAmount ?? '',
-    product.sellerProfit ?? '',
-    product.profitRate !== undefined ? formatPercent(product.profitRate) : '',
-    product.billedDate ?? '',
-    product.memo,
-  ])
+  const rows = items.map((product) => {
+    const shouldOutputSalesInfo = isSalesCompleted(product)
+
+    return [
+      product.code,
+      product.name,
+      getCategoryLabel(product.category),
+      getProductStatusLabel(product.status),
+      product.startPrice,
+      product.internalLowestPrice,
+      product.listingDate,
+      shouldOutputSalesInfo ? product.soldDate ?? '' : '',
+      shouldOutputSalesInfo && product.marketplace ? getChannelLabel(product.marketplace) : '',
+      shouldOutputSalesInfo ? product.soldPrice ?? '' : '',
+      shouldOutputSalesInfo ? product.shippingFee ?? '' : '',
+      shouldOutputSalesInfo && product.feeRate !== undefined ? formatFeeRate(product.feeRate) : '',
+      shouldOutputSalesInfo ? product.platformFee ?? '' : '',
+      shouldOutputSalesInfo ? product.netSales ?? '' : '',
+      shouldOutputSalesInfo ? product.billingAmount ?? '' : '',
+      shouldOutputSalesInfo ? product.sellerProfit ?? '' : '',
+      shouldOutputSalesInfo && product.profitRate !== undefined
+        ? formatPercent(product.profitRate)
+        : '',
+      shouldOutputSalesInfo ? product.billedDate ?? '' : '',
+      product.memo,
+    ]
+  })
 
   return [headers, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')
 }
@@ -920,8 +950,8 @@ function App() {
         const matchesMarketplace =
           marketplaceFilter === 'すべて' ||
           (marketplaceFilter === 'unsold'
-            ? product.soldPrice === undefined
-            : product.marketplace === marketplaceFilter)
+            ? !isSalesCompleted(product)
+            : isSalesCompleted(product) && product.marketplace === marketplaceFilter)
 
         return (
           matchesSearch &&
@@ -950,8 +980,7 @@ function App() {
         feeRate: clampFeeRatePercent(toNumber(saleForm.feeRate)) / 100,
       })
     : null
-  const billableProducts = sortedProducts.filter(hasBillingData)
-  const filteredBillableProducts = billableProducts
+  const filteredBillableProducts = sortedProducts.filter(isSalesCompleted)
   const pendingBillingProducts = filteredBillableProducts.filter(
     (product) => product.status === '請求待ち',
   )
@@ -982,7 +1011,7 @@ function App() {
   const hasReachedSettlementThreshold =
     billingSummary.pendingTotal >= settlementThreshold && billingSummary.pendingTotal > 0
   const soldProducts = sortedProducts
-    .filter(hasBillingData)
+    .filter(isSalesCompleted)
     .sort((first, second) => {
       const firstTime = first.soldDate ? new Date(first.soldDate).getTime() : 0
       const secondTime = second.soldDate ? new Date(second.soldDate).getTime() : 0
@@ -994,7 +1023,7 @@ function App() {
   )
   const overallSalesStats = createSalesStats(soldProducts)
   const allPendingBillingProducts = sortedProducts.filter(
-    (product) => hasBillingData(product) && product.status === '請求待ち',
+    (product) => product.status === '請求待ち',
   )
   const pendingBillingTotal = allPendingBillingProducts.reduce(
     (total, product) => total + (product.billingAmount ?? 0),
@@ -1003,7 +1032,6 @@ function App() {
   const relistAlertProducts = sortedProducts.filter(
     (product) =>
       product.status === '販売中' &&
-      product.soldPrice === undefined &&
       product.internalLowestPrice > 0 &&
       product.internalLowestPrice <= 300,
   )
@@ -1312,10 +1340,27 @@ function App() {
     }
 
     if (editingProductId) {
+      const shouldClearSalesInfo =
+        editingProduct &&
+        !isSalesCompletedStatus(productValues.status) &&
+        hasStoredSalesInfo(editingProduct)
+
+      if (
+        shouldClearSalesInfo &&
+        !window.confirm('ステータスを販売中に戻すと、登録済みの販売情報が削除されます。よろしいですか？')
+      ) {
+        return
+      }
+
       setProducts((current) =>
-        current.map((product) =>
-          product.id === editingProductId ? { ...product, ...productValues } : product,
-        ),
+        current.map((product) => {
+          if (product.id !== editingProductId) {
+            return product
+          }
+
+          const nextProduct = { ...product, ...productValues }
+          return isSalesCompleted(nextProduct) ? nextProduct : clearProductSalesInfo(nextProduct)
+        }),
       )
       setProductMessage('商品を更新しました。')
     } else {
@@ -1364,7 +1409,7 @@ function App() {
 
   const handleOpenSaleForm = (product: Product) => {
     setActiveSaleProductId(product.id)
-    setSaleForm(createSaleForm(product))
+    setSaleForm(createSaleForm(isSalesCompleted(product) ? product : undefined))
     setSaleError('')
     setSaleMessage('')
     setExpandedSections((current) => ({
@@ -2336,7 +2381,7 @@ function App() {
                 {filteredProducts.map((product) => {
                   const priceDropInfo = calculatePriceDropInfo(product)
                   const isDetailExpanded = isSectionExpanded(product.id, 'detail')
-                  const isSold = product.soldPrice !== undefined
+                  const isSold = isSalesCompleted(product)
                   const isPendingSettlement = product.status === '請求待ち'
                   const isSettled = product.status === '請求済み'
 
@@ -2435,6 +2480,13 @@ function App() {
                                 売却登録する
                               </button>
                               <p>売れたら販売価格・送料を登録します</p>
+                              <button
+                                className="edit-product-button"
+                                type="button"
+                                onClick={() => handleEditProduct(product)}
+                              >
+                                商品情報を編集
+                              </button>
                             </>
                           )}
                           {isPendingSettlement && (
