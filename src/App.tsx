@@ -51,16 +51,11 @@ type ActionCard = {
 
 type ProductCategory = 'shortSleeve' | 'longSleeve'
 type ProductStatus = '販売中' | '売却済み' | '請求待ち' | '請求済み' | '返却済み' | '保留'
-type PartnerStatus = 'active' | 'paused' | 'ended'
 
 type Partner = {
   id: string
   name: string
-  displayName: string
-  contact: string
-  memo: string
   createdAt: string
-  status: PartnerStatus
 }
 
 type Product = {
@@ -120,10 +115,6 @@ type ProductFormState = Omit<
 
 type PartnerFormState = {
   name: string
-  displayName: string
-  contact: string
-  memo: string
-  status: PartnerStatus
 }
 
 type SaleFormState = {
@@ -360,11 +351,6 @@ const productSortOptions: { value: ProductSortOption; label: string }[] = [
   { value: 'soldDateDesc', label: '販売日：新しい順' },
   { value: 'soldDateAsc', label: '販売日：古い順' },
 ]
-const partnerStatuses: { value: PartnerStatus; label: string }[] = [
-  { value: 'active', label: '稼働中' },
-  { value: 'paused', label: '停止中' },
-  { value: 'ended', label: '終了' },
-]
 const productStorageKey = 'partners-sales-products'
 const legacyProductStorageKey = 'offroad_partner_products'
 const legacyProductSequenceStorageKey = 'offroad_partner_product_next_number'
@@ -413,8 +399,6 @@ const getMaterialCategoryLabel = (category: MaterialCategory) =>
   materialCategories.find((item) => item.value === category)?.label ?? category
 const getMaterialTypeLabel = (type: MaterialType) =>
   type === 'file' ? 'PDFファイル' : 'URL'
-const getPartnerStatusLabel = (status: PartnerStatus) =>
-  partnerStatuses.find((item) => item.value === status)?.label ?? status
 const formatProductCode = (sequence: number) => `BT-${String(sequence).padStart(4, '0')}`
 const getProductCodeNumber = (code: string) => {
   const match = code.match(/^BT-(\d+)$/)
@@ -457,7 +441,7 @@ const getPartnerName = (partners: Partner[], partnerId?: string) => {
   }
 
   const partner = partners.find((item) => item.id === partnerId)
-  return partner?.displayName || partner?.name || '未設定'
+  return partner?.name || '未設定'
 }
 const formatMonthLabel = (monthKey: string) => {
   const [year, month] = monthKey.split('-')
@@ -602,10 +586,6 @@ const createInitialProductForm = (): ProductFormState => ({
 
 const createInitialPartnerForm = (): PartnerFormState => ({
   name: '',
-  displayName: '',
-  contact: '',
-  memo: '',
-  status: 'active',
 })
 
 const createInitialMaterialForm = (): MaterialFormState => ({
@@ -758,27 +738,25 @@ const normalizePartner = (value: unknown, index: number): Partner | null => {
     return null
   }
 
-  const source = value as Partial<Partner>
-  if (!source.name || typeof source.name !== 'string') {
+  const source = value as Partial<Partner> & { displayName?: unknown }
+  const name =
+    typeof source.name === 'string' && source.name
+      ? source.name
+      : typeof source.displayName === 'string' && source.displayName
+        ? source.displayName
+        : ''
+
+  if (!name) {
     return null
   }
 
-  const status: PartnerStatus = partnerStatuses.some((item) => item.value === source.status)
-    ? (source.status as PartnerStatus)
-    : 'active'
-
   return {
     id: typeof source.id === 'string' && source.id ? source.id : `${Date.now()}-${index}`,
-    name: source.name,
-    displayName:
-      typeof source.displayName === 'string' && source.displayName ? source.displayName : source.name,
-    contact: typeof source.contact === 'string' ? source.contact : '',
-    memo: typeof source.memo === 'string' ? source.memo : '',
+    name,
     createdAt:
       typeof source.createdAt === 'string' && source.createdAt
         ? source.createdAt
         : getTodayString(),
-    status,
   }
 }
 
@@ -960,19 +938,11 @@ function App() {
 
   const sortedPartners = useMemo(
     () =>
-      [...partners].sort((first, second) => {
-        const statusOrder: Record<PartnerStatus, number> = {
-          active: 0,
-          paused: 1,
-          ended: 2,
-        }
-        const statusDifference = statusOrder[first.status] - statusOrder[second.status]
-        if (statusDifference !== 0) {
-          return statusDifference
-        }
-
-        return getDateTime(second.createdAt) - getDateTime(first.createdAt)
-      }),
+      [...partners].sort(
+        (first, second) =>
+          getDateTime(second.createdAt) - getDateTime(first.createdAt) ||
+          first.name.localeCompare(second.name, 'ja'),
+      ),
     [partners],
   )
 
@@ -1095,7 +1065,7 @@ function App() {
     const partnerBuckets = [
       ...sortedPartners.map((partner) => ({
         id: partner.id,
-        label: partner.displayName,
+        label: partner.name,
       })),
       {
         id: 'unassigned',
@@ -1424,17 +1394,25 @@ function App() {
 
     const name = partnerForm.name.trim()
     if (!name) {
-      setPartnerError('氏名を入力してください。')
+      setPartnerError('販売パートナー名を入力してください。')
+      setPartnerMessage('')
+      return
+    }
+
+    const isDuplicateName = partners.some(
+      (partner) => partner.id !== editingPartnerId && partner.name === name,
+    )
+    if (
+      isDuplicateName &&
+      !window.confirm('同じ名前の販売パートナーがすでに登録されています。登録しますか？')
+    ) {
+      setPartnerError('同じ名前の販売パートナーがあります。')
       setPartnerMessage('')
       return
     }
 
     const partnerValues = {
       name,
-      displayName: partnerForm.displayName.trim() || name,
-      contact: partnerForm.contact.trim(),
-      memo: partnerForm.memo.trim(),
-      status: partnerForm.status,
     }
 
     if (editingPartnerId) {
@@ -1460,10 +1438,6 @@ function App() {
   const handleEditPartner = (partner: Partner) => {
     setPartnerForm({
       name: partner.name,
-      displayName: partner.displayName,
-      contact: partner.contact,
-      memo: partner.memo,
-      status: partner.status,
     })
     setEditingPartnerId(partner.id)
     setPartnerError('')
@@ -2087,7 +2061,7 @@ function App() {
                 <option value="">未設定</option>
                 {sortedPartners.map((partner) => (
                   <option key={partner.id} value={partner.id}>
-                    {partner.displayName}（{getPartnerStatusLabel(partner.status)}）
+                    {partner.name}
                   </option>
                 ))}
               </select>
@@ -2401,7 +2375,7 @@ function App() {
                   <option value="unassigned">未設定</option>
                   {sortedPartners.map((partner) => (
                     <option key={partner.id} value={partner.id}>
-                      {partner.displayName}
+                      {partner.name}
                     </option>
                   ))}
                 </select>
@@ -2904,7 +2878,7 @@ function App() {
                 <option value="unassigned">未設定</option>
                 {sortedPartners.map((partner) => (
                   <option key={partner.id} value={partner.id}>
-                    {partner.displayName}
+                    {partner.name}
                   </option>
                 ))}
               </select>
@@ -3069,7 +3043,7 @@ function App() {
                 <option value="unassigned">未設定</option>
                 {sortedPartners.map((partner) => (
                   <option key={partner.id} value={partner.id}>
-                    {partner.displayName}
+                    {partner.name}
                   </option>
                 ))}
               </select>
@@ -3127,7 +3101,7 @@ function App() {
             {editingPartner && (
               <div className="editing-notice">
                 <strong>販売パートナーを編集中</strong>
-                <span>{editingPartner.displayName} を編集中</span>
+                <span>{editingPartner.name} を編集中</span>
                 <p>内容を修正して、販売パートナーを更新するボタンを押してください。</p>
               </div>
             )}
@@ -3136,55 +3110,12 @@ function App() {
             {partnerMessage && <p className="form-message success">{partnerMessage}</p>}
 
             <label className="field-group">
-              <span>氏名</span>
+              <span>販売パートナー名</span>
               <input
-                placeholder="例：田中 太郎"
+                placeholder="例：田中"
                 type="text"
                 value={partnerForm.name}
                 onChange={(event) => updatePartnerForm('name', event.target.value)}
-              />
-            </label>
-
-            <label className="field-group">
-              <span>表示名</span>
-              <input
-                placeholder="例：田中さん"
-                type="text"
-                value={partnerForm.displayName}
-                onChange={(event) => updatePartnerForm('displayName', event.target.value)}
-              />
-            </label>
-
-            <label className="field-group">
-              <span>連絡先</span>
-              <input
-                placeholder="電話番号・メール・LINEなど"
-                type="text"
-                value={partnerForm.contact}
-                onChange={(event) => updatePartnerForm('contact', event.target.value)}
-              />
-            </label>
-
-            <label className="field-group">
-              <span>ステータス</span>
-              <select
-                value={partnerForm.status}
-                onChange={(event) => updatePartnerForm('status', event.target.value as PartnerStatus)}
-              >
-                {partnerStatuses.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field-group">
-              <span>メモ</span>
-              <textarea
-                placeholder="担当範囲・注意事項など"
-                value={partnerForm.memo}
-                onChange={(event) => updatePartnerForm('memo', event.target.value)}
               />
             </label>
 
@@ -3207,28 +3138,29 @@ function App() {
               <div className="partner-card-list">
                 {sortedPartners.map((partner) => (
                   <article className="partner-card" key={partner.id}>
+                    {(() => {
+                      const assignedProducts = products.filter(
+                        (product) => product.partnerId === partner.id,
+                      )
+                      const soldCount = assignedProducts.filter(hasBillingData).length
+
+                      return (
+                        <>
                     <div className="partner-card-header">
                       <div>
-                        <h4>{partner.displayName}</h4>
-                        <p>{partner.name}</p>
+                        <h4>{partner.name}</h4>
+                        <p>登録日：{partner.createdAt.split('T')[0]}</p>
                       </div>
-                      <span className={`partner-status ${partner.status}`}>
-                        {getPartnerStatusLabel(partner.status)}
-                      </span>
                     </div>
 
                     <dl className="partner-detail-list">
                       <div>
-                        <dt>連絡先</dt>
-                        <dd>{partner.contact || '未入力'}</dd>
+                        <dt>担当商品数</dt>
+                        <dd>{assignedProducts.length}件</dd>
                       </div>
                       <div>
-                        <dt>登録日</dt>
-                        <dd>{partner.createdAt.split('T')[0]}</dd>
-                      </div>
-                      <div>
-                        <dt>メモ</dt>
-                        <dd>{partner.memo || 'メモなし'}</dd>
+                        <dt>売却済み件数</dt>
+                        <dd>{soldCount}件</dd>
                       </div>
                     </dl>
 
@@ -3248,6 +3180,9 @@ function App() {
                         削除
                       </button>
                     </div>
+                        </>
+                      )
+                    })()}
                   </article>
                 ))}
               </div>

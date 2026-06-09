@@ -1691,30 +1691,6 @@
   overflow-wrap: anywhere;
 }
 
-.partner-status {
-  background: #ecfdf5;
-  border: 1px solid #bbebd3;
-  border-radius: 999px;
-  color: #17643a;
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1.2;
-  padding: 6px 8px;
-}
-
-.partner-status.paused {
-  background: #fff7ed;
-  border-color: #fed7aa;
-  color: #9a4f0f;
-}
-
-.partner-status.ended {
-  background: #f6f8fb;
-  border-color: #dbe3ee;
-  color: #64748b;
-}
-
 .partner-detail-list {
   display: grid;
   gap: 0;
