@@ -675,7 +675,7 @@
 
 .product-code,
 .product-category-line,
-.product-partner-line {
+.product-username-line {
   color: #64748b;
   font-size: 11px;
   font-weight: 800;
@@ -1636,123 +1636,6 @@
 .sales-result-meta {
   display: grid;
   gap: 3px;
-}
-
-.partners-layout,
-.partner-card-list,
-.partner-stats-list {
-  display: grid;
-  gap: 14px;
-}
-
-.partner-list-section,
-.partner-card,
-.partner-stats-card {
-  background: #ffffff;
-  border: 1px solid #e1e9f3;
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(29, 43, 64, 0.05);
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-}
-
-.partner-list-section h3,
-.partner-stats-card h4 {
-  color: #172033;
-  font-size: 16px;
-  font-weight: 900;
-  line-height: 1.35;
-  margin: 0;
-}
-
-.partner-card-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.partner-card-header h4 {
-  color: #172033;
-  font-size: 16px;
-  font-weight: 900;
-  line-height: 1.35;
-  margin: 0 0 3px;
-  overflow-wrap: anywhere;
-}
-
-.partner-card-header p {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.partner-detail-list {
-  display: grid;
-  gap: 0;
-  margin: 0;
-}
-
-.partner-detail-list div {
-  border-top: 1px solid #edf2f7;
-  display: grid;
-  gap: 4px;
-  padding: 9px 0;
-}
-
-.partner-detail-list div:first-child {
-  border-top: 0;
-}
-
-.partner-detail-list dt,
-.partner-stats-grid span {
-  color: #5f7088;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.partner-detail-list dd {
-  color: #172033;
-  font-size: 13px;
-  font-weight: 900;
-  line-height: 1.5;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.partner-actions {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr 1fr;
-}
-
-.partner-stats-grid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.partner-stats-grid div {
-  background: #f6f8fb;
-  border: 1px solid #e5edf6;
-  border-radius: 10px;
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  padding: 10px;
-}
-
-.partner-stats-grid strong {
-  color: #172033;
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
 }
 
 .rules-layout {

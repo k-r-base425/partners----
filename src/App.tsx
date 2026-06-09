@@ -15,10 +15,9 @@ type ScreenId =
   | 'billing'
   | 'sales'
   | 'resources'
-  | 'partners'
 
 type BottomNavItem = {
-  id: Exclude<ScreenId, 'resources' | 'partners'>
+  id: Exclude<ScreenId, 'resources'>
   label: string
   icon: string
 }
@@ -27,20 +26,6 @@ type DashboardCard = {
   label: string
   value: string
   variant?: 'amount'
-}
-
-type PartnerStats = {
-  id: string
-  label: string
-  productCount: number
-  activeProductCount: number
-  soldCount: number
-  pendingBillingCount: number
-  billedCount: number
-  totalSales: number
-  totalBilling: number
-  totalSellerProfit: number
-  averageSales: number
 }
 
 type ActionCard = {
@@ -52,16 +37,11 @@ type ActionCard = {
 type ProductCategory = 'shortSleeve' | 'longSleeve'
 type ProductStatus = '販売中' | '売却済み' | '請求待ち' | '請求済み' | '返却済み' | '保留'
 
-type Partner = {
-  id: string
-  name: string
-  createdAt: string
-}
-
 type Product = {
   id: string
   code: string
   name: string
+  username?: string
   category: ProductCategory
   startPrice: number
   targetPrice: number
@@ -70,7 +50,6 @@ type Product = {
   status: ProductStatus
   memo: string
   createdAt: string
-  partnerId?: string
   soldDate?: string
   marketplace?: SalesChannelId
   soldPrice?: number
@@ -110,11 +89,6 @@ type ProductFormState = Omit<
   startPrice: string
   targetPrice: string
   internalLowestPrice: string
-  partnerId: string
-}
-
-type PartnerFormState = {
-  name: string
 }
 
 type SaleFormState = {
@@ -150,7 +124,6 @@ type ProductSortOption =
   | 'soldDateDesc'
   | 'soldDateAsc'
 type BillingStatusFilter = 'すべて' | '請求待ち' | '請求済み'
-type PartnerFilter = string | 'unassigned' | 'すべて'
 type MonthFilter = string | 'すべて'
 type RuleSectionId =
   | 'basic'
@@ -201,7 +174,6 @@ const screenLabels: Record<ScreenId, string> = {
   billing: '請求管理',
   sales: '販売実績',
   resources: '販売ルール・資料',
-  partners: '販売パートナー管理',
 }
 
 const quickActions: ActionCard[] = [
@@ -224,11 +196,6 @@ const quickActions: ActionCard[] = [
     label: 'ルール・資料を見る',
     description: '販売ルールとPDF資料の案内へ',
     target: 'resources',
-  },
-  {
-    label: '販売パートナー管理',
-    description: '担当者と実績を管理',
-    target: 'partners',
   },
 ]
 
@@ -355,7 +322,6 @@ const productStorageKey = 'partners-sales-products'
 const legacyProductStorageKey = 'offroad_partner_products'
 const legacyProductSequenceStorageKey = 'offroad_partner_product_next_number'
 const materialStorageKey = 'partners-sales-materials'
-const partnerStorageKey = 'partners-sales-partners'
 const materialCategories: { value: MaterialCategory; label: string }[] = [
   { value: 'manual', label: '運用マニュアル' },
   { value: 'salesData', label: '販売データ' },
@@ -435,13 +401,9 @@ const getDateTime = (dateValue?: string) => {
   const time = new Date(dateValue).getTime()
   return Number.isFinite(time) ? time : 0
 }
-const getPartnerName = (partners: Partner[], partnerId?: string) => {
-  if (!partnerId) {
-    return '未設定'
-  }
-
-  const partner = partners.find((item) => item.id === partnerId)
-  return partner?.name || '未設定'
+const getUsernameLabel = (username?: string) => {
+  const trimmedUsername = username?.trim()
+  return trimmedUsername ? trimmedUsername : '未設定'
 }
 const formatMonthLabel = (monthKey: string) => {
   const [year, month] = monthKey.split('-')
@@ -476,9 +438,6 @@ const compareProductsBySortOption = (
       return getDateTime(second.createdAt) - getDateTime(first.createdAt)
   }
 }
-const matchesPartnerFilter = (product: Product, partnerFilter: PartnerFilter) =>
-  partnerFilter === 'すべて' ||
-  (partnerFilter === 'unassigned' ? !product.partnerId : product.partnerId === partnerFilter)
 const createSalesStats = (items: Product[]) => {
   const count = items.length
   const totalSales = items.reduce((total, product) => total + (product.soldPrice ?? 0), 0)
@@ -509,11 +468,11 @@ const escapeCsvValue = (value: unknown) => {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-const createProductsCsv = (items: Product[], partners: Partner[]) => {
+const createProductsCsv = (items: Product[]) => {
   const headers = [
     '商品番号',
     '商品名',
-    '販売パートナー',
+    'ユーザーネーム',
     '商品種別',
     'ステータス',
     '出品開始価格',
@@ -536,7 +495,7 @@ const createProductsCsv = (items: Product[], partners: Partner[]) => {
   const rows = items.map((product) => [
     product.code,
     product.name,
-    getPartnerName(partners, product.partnerId),
+    getUsernameLabel(product.username),
     getCategoryLabel(product.category),
     product.status,
     product.startPrice,
@@ -574,6 +533,7 @@ const downloadTextFile = (content: string, fileName: string, type: string) => {
 
 const createInitialProductForm = (): ProductFormState => ({
   name: '',
+  username: '',
   category: 'shortSleeve',
   startPrice: '',
   targetPrice: '',
@@ -581,11 +541,6 @@ const createInitialProductForm = (): ProductFormState => ({
   listingDate: '',
   status: '販売中',
   memo: '',
-  partnerId: '',
-})
-
-const createInitialPartnerForm = (): PartnerFormState => ({
-  name: '',
 })
 
 const createInitialMaterialForm = (): MaterialFormState => ({
@@ -698,6 +653,7 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     id: typeof source.id === 'string' && source.id ? source.id : `${Date.now()}-${index}`,
     code,
     name: source.name,
+    username: typeof source.username === 'string' ? source.username : '',
     category,
     startPrice,
     targetPrice,
@@ -706,7 +662,6 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     status,
     memo: typeof source.memo === 'string' ? source.memo : '',
     createdAt,
-    partnerId: typeof source.partnerId === 'string' && source.partnerId ? source.partnerId : undefined,
     soldDate: typeof source.soldDate === 'string' ? source.soldDate : undefined,
     marketplace,
     soldPrice:
@@ -730,33 +685,6 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     profitRate:
       source.profitRate === undefined ? undefined : toStoredNumber(source.profitRate),
     billedDate: typeof source.billedDate === 'string' ? source.billedDate : undefined,
-  }
-}
-
-const normalizePartner = (value: unknown, index: number): Partner | null => {
-  if (!value || typeof value !== 'object') {
-    return null
-  }
-
-  const source = value as Partial<Partner> & { displayName?: unknown }
-  const name =
-    typeof source.name === 'string' && source.name
-      ? source.name
-      : typeof source.displayName === 'string' && source.displayName
-        ? source.displayName
-        : ''
-
-  if (!name) {
-    return null
-  }
-
-  return {
-    id: typeof source.id === 'string' && source.id ? source.id : `${Date.now()}-${index}`,
-    name,
-    createdAt:
-      typeof source.createdAt === 'string' && source.createdAt
-        ? source.createdAt
-        : getTodayString(),
   }
 }
 
@@ -814,26 +742,6 @@ const loadProducts = () => {
   }
 }
 
-const loadPartners = () => {
-  try {
-    const storedPartners = localStorage.getItem(partnerStorageKey)
-    if (!storedPartners) {
-      return []
-    }
-
-    const parsedPartners: unknown = JSON.parse(storedPartners)
-    if (!Array.isArray(parsedPartners)) {
-      return []
-    }
-
-    return parsedPartners
-      .map((partner, index) => normalizePartner(partner, index))
-      .filter((partner): partner is Partner => Boolean(partner))
-  } catch {
-    return []
-  }
-}
-
 const loadMaterials = () => {
   try {
     const storedMaterials = localStorage.getItem(materialStorageKey)
@@ -871,20 +779,15 @@ function App() {
   const [shippingFeeInput, setShippingFeeInput] = useState('215')
   const [feeRateInput, setFeeRateInput] = useState('10')
   const [products, setProducts] = useState<Product[]>(() => loadProducts())
-  const [partners, setPartners] = useState<Partner[]>(() => loadPartners())
   const [productForm, setProductForm] = useState<ProductFormState>(() => createInitialProductForm())
-  const [partnerForm, setPartnerForm] = useState<PartnerFormState>(() => createInitialPartnerForm())
   const [productError, setProductError] = useState('')
   const [productMessage, setProductMessage] = useState('')
-  const [partnerError, setPartnerError] = useState('')
-  const [partnerMessage, setPartnerMessage] = useState('')
-  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null)
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [productSearchQuery, setProductSearchQuery] = useState('')
+  const [productUsernameFilter, setProductUsernameFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
   const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>('すべて')
-  const [productPartnerFilter, setProductPartnerFilter] = useState<PartnerFilter>('すべて')
   const [productSortOption, setProductSortOption] = useState<ProductSortOption>('createdDesc')
   const [activeSaleProductId, setActiveSaleProductId] = useState<string | null>(null)
   const [saleForm, setSaleForm] = useState<SaleFormState>(() => createSaleForm())
@@ -896,8 +799,8 @@ function App() {
   const [salesChannelFilter, setSalesChannelFilter] = useState<SalesChannelId | 'すべて'>('すべて')
   const [salesCategoryFilter, setSalesCategoryFilter] = useState<CategoryFilter>('すべて')
   const [salesStatusFilter, setSalesStatusFilter] = useState<BillingStatusFilter>('すべて')
-  const [salesPartnerFilter, setSalesPartnerFilter] = useState<PartnerFilter>('すべて')
-  const [billingPartnerFilter, setBillingPartnerFilter] = useState<PartnerFilter>('すべて')
+  const [salesUsernameFilter, setSalesUsernameFilter] = useState('')
+  const [billingUsernameFilter, setBillingUsernameFilter] = useState('')
   const [openRuleSectionIds, setOpenRuleSectionIds] = useState<RuleSectionId[]>(['basic'])
   const [materials, setMaterials] = useState<Material[]>(() => loadMaterials())
   const [materialForm, setMaterialForm] = useState<MaterialFormState>(() =>
@@ -936,16 +839,6 @@ function App() {
     { label: '利益率', value: formatPercent(salesResult.profitRate) },
   ]
 
-  const sortedPartners = useMemo(
-    () =>
-      [...partners].sort(
-        (first, second) =>
-          getDateTime(second.createdAt) - getDateTime(first.createdAt) ||
-          first.name.localeCompare(second.name, 'ja'),
-      ),
-    [partners],
-  )
-
   const sortedProducts = useMemo(
     () =>
       [...products].sort(
@@ -956,14 +849,18 @@ function App() {
 
   const filteredProducts = useMemo(() => {
     const normalizedSearchQuery = productSearchQuery.trim().toLowerCase()
+    const normalizedUsernameFilter = productUsernameFilter.trim().toLowerCase()
 
     return sortedProducts
       .filter((product) => {
         const matchesSearch =
           normalizedSearchQuery === '' ||
-          [product.name, product.code, product.memo].some((value) =>
+          [product.name, product.code, product.memo, product.username ?? ''].some((value) =>
             value.toLowerCase().includes(normalizedSearchQuery),
           )
+        const matchesUsername =
+          normalizedUsernameFilter === '' ||
+          (product.username ?? '').toLowerCase().includes(normalizedUsernameFilter)
         const matchesStatus = statusFilter === 'すべて' || product.status === statusFilter
         const matchesCategory = categoryFilter === 'すべて' || product.category === categoryFilter
         const matchesMarketplace =
@@ -971,24 +868,22 @@ function App() {
           (marketplaceFilter === 'unsold'
             ? product.soldPrice === undefined
             : product.marketplace === marketplaceFilter)
-        const matchesPartner =
-          matchesPartnerFilter(product, productPartnerFilter)
 
         return (
           matchesSearch &&
+          matchesUsername &&
           matchesStatus &&
           matchesCategory &&
-          matchesMarketplace &&
-          matchesPartner
+          matchesMarketplace
         )
       })
       .sort((first, second) => compareProductsBySortOption(first, second, productSortOption))
   }, [
     categoryFilter,
     marketplaceFilter,
-    productPartnerFilter,
     productSearchQuery,
     productSortOption,
+    productUsernameFilter,
     sortedProducts,
     statusFilter,
   ])
@@ -1004,9 +899,13 @@ function App() {
       })
     : null
   const billableProducts = sortedProducts.filter(hasBillingData)
-  const filteredBillableProducts = billableProducts.filter((product) =>
-    matchesPartnerFilter(product, billingPartnerFilter),
-  )
+  const filteredBillableProducts = billableProducts.filter((product) => {
+    const normalizedUsernameFilter = billingUsernameFilter.trim().toLowerCase()
+    return (
+      normalizedUsernameFilter === '' ||
+      (product.username ?? '').toLowerCase().includes(normalizedUsernameFilter)
+    )
+  })
   const pendingBillingProducts = filteredBillableProducts.filter(
     (product) => product.status === '請求待ち',
   )
@@ -1038,6 +937,7 @@ function App() {
     new Set(soldProducts.map((product) => getSoldMonthKey(product.soldDate)).filter(Boolean)),
   ).sort((first, second) => second.localeCompare(first))
   const filteredSalesProducts = soldProducts.filter((product) => {
+    const normalizedUsernameFilter = salesUsernameFilter.trim().toLowerCase()
     const matchesMonth =
       salesMonthFilter === 'すべて' || getSoldMonthKey(product.soldDate) === salesMonthFilter
     const matchesChannel =
@@ -1045,8 +945,10 @@ function App() {
     const matchesCategory =
       salesCategoryFilter === 'すべて' || product.category === salesCategoryFilter
     const matchesStatus = salesStatusFilter === 'すべて' || product.status === salesStatusFilter
-    const matchesPartner = matchesPartnerFilter(product, salesPartnerFilter)
-    return matchesMonth && matchesChannel && matchesCategory && matchesStatus && matchesPartner
+    const matchesUsername =
+      normalizedUsernameFilter === '' ||
+      (product.username ?? '').toLowerCase().includes(normalizedUsernameFilter)
+    return matchesMonth && matchesChannel && matchesCategory && matchesStatus && matchesUsername
   })
   const salesSummary = createSalesStats(filteredSalesProducts)
   const shortSleeveSalesStats = createSalesStats(
@@ -1061,50 +963,6 @@ function App() {
   const yahooSalesStats = createSalesStats(
     filteredSalesProducts.filter((product) => product.marketplace === 'yahoo-fleamarket'),
   )
-  const partnerStats = useMemo<PartnerStats[]>(() => {
-    const partnerBuckets = [
-      ...sortedPartners.map((partner) => ({
-        id: partner.id,
-        label: partner.name,
-      })),
-      {
-        id: 'unassigned',
-        label: '未設定',
-      },
-    ]
-
-    return partnerBuckets.map((bucket) => {
-      const targetProducts =
-        bucket.id === 'unassigned'
-          ? products.filter((product) => !product.partnerId)
-          : products.filter((product) => product.partnerId === bucket.id)
-      const soldItems = targetProducts.filter(hasBillingData)
-      const totalSales = soldItems.reduce((total, product) => total + (product.soldPrice ?? 0), 0)
-      const totalBilling = soldItems.reduce(
-        (total, product) => total + (product.billingAmount ?? 0),
-        0,
-      )
-      const totalSellerProfit = soldItems.reduce(
-        (total, product) => total + (product.sellerProfit ?? 0),
-        0,
-      )
-
-      return {
-        id: bucket.id,
-        label: bucket.label,
-        productCount: targetProducts.length,
-        activeProductCount: targetProducts.filter((product) => product.status === '販売中').length,
-        soldCount: soldItems.length,
-        pendingBillingCount: targetProducts.filter((product) => product.status === '請求待ち')
-          .length,
-        billedCount: targetProducts.filter((product) => product.status === '請求済み').length,
-        totalSales,
-        totalBilling,
-        totalSellerProfit,
-        averageSales: soldItems.length > 0 ? totalSales / soldItems.length : 0,
-      }
-    })
-  }, [products, sortedPartners])
   const filteredMaterials = useMemo(() => {
     const normalizedSearchQuery = materialSearchQuery.trim().toLowerCase()
 
@@ -1158,10 +1016,6 @@ function App() {
     localStorage.setItem(productStorageKey, JSON.stringify(products))
   }, [products])
 
-  useEffect(() => {
-    localStorage.setItem(partnerStorageKey, JSON.stringify(partners))
-  }, [partners])
-
   const updateProductForm = <Key extends keyof ProductFormState>(
     key: Key,
     value: ProductFormState[Key],
@@ -1169,15 +1023,6 @@ function App() {
     setProductForm((current) => ({ ...current, [key]: value }))
     setProductError('')
     setProductMessage('')
-  }
-
-  const updatePartnerForm = <Key extends keyof PartnerFormState>(
-    key: Key,
-    value: PartnerFormState[Key],
-  ) => {
-    setPartnerForm((current) => ({ ...current, [key]: value }))
-    setPartnerError('')
-    setPartnerMessage('')
   }
 
   const updateSaleForm = <Key extends keyof SaleFormState>(
@@ -1242,10 +1087,10 @@ function App() {
 
   const handleResetProductFilters = () => {
     setProductSearchQuery('')
+    setProductUsernameFilter('')
     setStatusFilter('すべて')
     setCategoryFilter('すべて')
     setMarketplaceFilter('すべて')
-    setProductPartnerFilter('すべて')
     setProductSortOption('createdDesc')
   }
 
@@ -1383,96 +1228,6 @@ function App() {
     setProductError('')
   }
 
-  const resetPartnerForm = () => {
-    setPartnerForm(createInitialPartnerForm())
-    setEditingPartnerId(null)
-    setPartnerError('')
-  }
-
-  const handlePartnerSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
-    const name = partnerForm.name.trim()
-    if (!name) {
-      setPartnerError('販売パートナー名を入力してください。')
-      setPartnerMessage('')
-      return
-    }
-
-    const isDuplicateName = partners.some(
-      (partner) => partner.id !== editingPartnerId && partner.name === name,
-    )
-    if (
-      isDuplicateName &&
-      !window.confirm('同じ名前の販売パートナーがすでに登録されています。登録しますか？')
-    ) {
-      setPartnerError('同じ名前の販売パートナーがあります。')
-      setPartnerMessage('')
-      return
-    }
-
-    const partnerValues = {
-      name,
-    }
-
-    if (editingPartnerId) {
-      setPartners((current) =>
-        current.map((partner) =>
-          partner.id === editingPartnerId ? { ...partner, ...partnerValues } : partner,
-        ),
-      )
-      setPartnerMessage('販売パートナーを更新しました。')
-    } else {
-      const newPartner: Partner = {
-        id: `${Date.now()}`,
-        createdAt: getTodayString(),
-        ...partnerValues,
-      }
-      setPartners((current) => [newPartner, ...current])
-      setPartnerMessage('販売パートナーを登録しました。')
-    }
-
-    resetPartnerForm()
-  }
-
-  const handleEditPartner = (partner: Partner) => {
-    setPartnerForm({
-      name: partner.name,
-    })
-    setEditingPartnerId(partner.id)
-    setPartnerError('')
-    setPartnerMessage('販売パートナーを編集モードにしました。')
-  }
-
-  const handleCancelPartnerEdit = () => {
-    resetPartnerForm()
-    setPartnerMessage('')
-  }
-
-  const handleDeletePartner = (partnerId: string) => {
-    const linkedProductCount = products.filter((product) => product.partnerId === partnerId).length
-    const confirmMessage =
-      linkedProductCount > 0
-        ? `この販売パートナーを削除します。よろしいですか？\n紐づいている商品 ${linkedProductCount}件 は未設定扱いになります。`
-        : 'この販売パートナーを削除します。よろしいですか？'
-
-    if (!window.confirm(confirmMessage)) {
-      return
-    }
-
-    setPartners((current) => current.filter((partner) => partner.id !== partnerId))
-    setProducts((current) =>
-      current.map((product) =>
-        product.partnerId === partnerId ? { ...product, partnerId: undefined } : product,
-      ),
-    )
-    if (editingPartnerId === partnerId) {
-      resetPartnerForm()
-    }
-    setPartnerMessage('販売パートナーを削除しました。')
-    setPartnerError('')
-  }
-
   const handleProductSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -1484,12 +1239,12 @@ function App() {
 
     const productValues = {
       name: productForm.name.trim(),
+      username: productForm.username?.trim() ?? '',
       category: productForm.category,
       ...getProductPriceValues(productForm),
       listingDate: productForm.listingDate,
       status: productForm.status,
       memo: productForm.memo.trim(),
-      partnerId: productForm.partnerId || undefined,
     }
 
     if (editingProductId) {
@@ -1520,6 +1275,7 @@ function App() {
   const handleEditProduct = (product: Product) => {
     setProductForm({
       name: product.name,
+      username: product.username ?? '',
       category: product.category,
       startPrice: product.startPrice ? String(product.startPrice) : '',
       targetPrice: product.targetPrice ? String(product.targetPrice) : '',
@@ -1527,7 +1283,6 @@ function App() {
       listingDate: product.listingDate,
       status: product.status,
       memo: product.memo,
-      partnerId: product.partnerId ?? '',
     })
     setEditingProductId(product.id)
     setProductError('')
@@ -1659,7 +1414,7 @@ function App() {
   }
 
   const handleExportCsv = () => {
-    const csvContent = `\uFEFF${createProductsCsv(sortedProducts, partners)}`
+    const csvContent = `\uFEFF${createProductsCsv(sortedProducts)}`
     downloadTextFile(csvContent, `partners-sales-${getTodayString()}.csv`, 'text/csv;charset=utf-8')
     setProductMessage('CSVをエクスポートしました。')
     setProductError('')
@@ -1670,7 +1425,6 @@ function App() {
       JSON.stringify(
         {
           products,
-          partners,
           materials,
         },
         null,
@@ -1712,10 +1466,6 @@ function App() {
           : parsedData && typeof parsedData === 'object' && Array.isArray((parsedData as { products?: unknown }).products)
             ? (parsedData as { products: unknown[] }).products
             : null
-      const partnerData =
-        parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)
-          ? (parsedData as { partners?: unknown }).partners
-          : undefined
       const materialData =
         parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)
           ? (parsedData as { materials?: unknown }).materials
@@ -1750,11 +1500,6 @@ function App() {
 
         return normalizedProduct
       })
-      const importedPartners = Array.isArray(partnerData)
-        ? partnerData
-            .map((item, index) => normalizePartner(item, index))
-            .filter((partner): partner is Partner => Boolean(partner))
-        : partners
       const importedMaterials = Array.isArray(materialData)
         ? materialData
             .map((item, index) => normalizeMaterial(item, index))
@@ -1762,19 +1507,14 @@ function App() {
         : materials
 
       localStorage.setItem(productStorageKey, JSON.stringify(importedProducts))
-      localStorage.setItem(partnerStorageKey, JSON.stringify(importedPartners))
       localStorage.setItem(materialStorageKey, JSON.stringify(importedMaterials))
       setProducts(importedProducts)
-      setPartners(importedPartners)
       setMaterials(importedMaterials)
       resetProductForm()
-      resetPartnerForm()
       handleCancelSaleForm()
       setExpandedSections({})
       setProductMessage('バックアップデータを復元しました。')
       setProductError('')
-      setPartnerMessage('')
-      setPartnerError('')
       setMaterialMessage('')
       setMaterialError('')
       setSaleMessage('')
@@ -1827,7 +1567,7 @@ function App() {
           販売先：
           {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
         </span>
-        <span>担当：{getPartnerName(partners, product.partnerId)}</span>
+        <span>ユーザー：{getUsernameLabel(product.username)}</span>
       </div>
 
       <div className="billing-product-amounts">
@@ -1892,50 +1632,6 @@ function App() {
     </article>
   )
 
-  const renderPartnerStatsCard = (stats: PartnerStats) => (
-    <article className="partner-stats-card" key={stats.id}>
-      <h4>{stats.label}</h4>
-      <div className="partner-stats-grid">
-        <div>
-          <span>商品登録数</span>
-          <strong>{stats.productCount}件</strong>
-        </div>
-        <div>
-          <span>販売中</span>
-          <strong>{stats.activeProductCount}件</strong>
-        </div>
-        <div>
-          <span>売却済み</span>
-          <strong>{stats.soldCount}件</strong>
-        </div>
-        <div>
-          <span>請求待ち</span>
-          <strong>{stats.pendingBillingCount}件</strong>
-        </div>
-        <div>
-          <span>請求済み</span>
-          <strong>{stats.billedCount}件</strong>
-        </div>
-        <div>
-          <span>総販売額</span>
-          <strong>{formatYen(stats.totalSales)}</strong>
-        </div>
-        <div>
-          <span>総請求額</span>
-          <strong>{formatYen(stats.totalBilling)}</strong>
-        </div>
-        <div>
-          <span>利益合計</span>
-          <strong>{formatYen(stats.totalSellerProfit)}</strong>
-        </div>
-        <div>
-          <span>平均販売単価</span>
-          <strong>{formatYen(stats.averageSales)}</strong>
-        </div>
-      </div>
-    </article>
-  )
-
   const renderSalesResultCard = (product: Product) => (
     <article className="sales-result-card" key={product.id}>
       <div className="sales-result-header">
@@ -1956,7 +1652,7 @@ function App() {
           販売先：
           {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
         </span>
-        <span>担当：{getPartnerName(partners, product.partnerId)}</span>
+        <span>ユーザー：{getUsernameLabel(product.username)}</span>
       </div>
 
       <div className="sales-result-amounts">
@@ -2047,21 +1743,6 @@ function App() {
                 {productTypes.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field-group">
-              <span>販売パートナー</span>
-              <select
-                value={productForm.partnerId}
-                onChange={(event) => updateProductForm('partnerId', event.target.value)}
-              >
-                <option value="">未設定</option>
-                {sortedPartners.map((partner) => (
-                  <option key={partner.id} value={partner.id}>
-                    {partner.name}
                   </option>
                 ))}
               </select>
@@ -2183,6 +1864,16 @@ function App() {
                 type="text"
                 value={productForm.name}
                 onChange={(event) => updateProductForm('name', event.target.value)}
+              />
+            </label>
+
+            <label className="field-group">
+              <span>ユーザーネーム</span>
+              <input
+                placeholder="例：@tanaka / 田中さん / user001"
+                type="text"
+                value={productForm.username ?? ''}
+                onChange={(event) => updateProductForm('username', event.target.value)}
               />
             </label>
 
@@ -2320,6 +2011,16 @@ function App() {
               </label>
 
               <label className="field-group">
+                <span>ユーザーネームで絞り込み</span>
+                <input
+                  placeholder="例：@tanaka"
+                  type="search"
+                  value={productUsernameFilter}
+                  onChange={(event) => setProductUsernameFilter(event.target.value)}
+                />
+              </label>
+
+              <label className="field-group">
                 <span>ステータス</span>
                 <select
                   value={statusFilter}
@@ -2360,22 +2061,6 @@ function App() {
                   {productMarketplaceFilterOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="field-group">
-                <span>販売パートナー</span>
-                <select
-                  value={productPartnerFilter}
-                  onChange={(event) => setProductPartnerFilter(event.target.value as PartnerFilter)}
-                >
-                  <option value="すべて">すべて</option>
-                  <option value="unassigned">未設定</option>
-                  {sortedPartners.map((partner) => (
-                    <option key={partner.id} value={partner.id}>
-                      {partner.name}
                     </option>
                   ))}
                 </select>
@@ -2442,8 +2127,8 @@ function App() {
                           <h4 className="product-title">{product.name}</h4>
                           <p className="product-code">{product.code || '商品番号なし'}</p>
                           <p className="product-category-line">{getCategoryLabel(product.category)}</p>
-                          <p className="product-partner-line">
-                            担当：{getPartnerName(partners, product.partnerId)}
+                          <p className="product-username-line">
+                            ユーザー：{getUsernameLabel(product.username)}
                           </p>
 
                           <div className="product-metrics">
@@ -2500,8 +2185,8 @@ function App() {
                                 <strong>{getCategoryLabel(product.category)}</strong>
                               </div>
                               <div className="detail-box">
-                                <span>販売パートナー</span>
-                                <strong>{getPartnerName(partners, product.partnerId)}</strong>
+                                <span>ユーザーネーム</span>
+                                <strong>{getUsernameLabel(product.username)}</strong>
                               </div>
                               <div className="detail-box">
                                 <span>出品開始価格</span>
@@ -2869,19 +2554,13 @@ function App() {
           <section className="billing-list-section" aria-labelledby="billing-filter-title">
             <h3 id="billing-filter-title">絞り込み</h3>
             <label className="field-group">
-              <span>販売パートナー</span>
-              <select
-                value={billingPartnerFilter}
-                onChange={(event) => setBillingPartnerFilter(event.target.value as PartnerFilter)}
-              >
-                <option value="すべて">すべて</option>
-                <option value="unassigned">未設定</option>
-                {sortedPartners.map((partner) => (
-                  <option key={partner.id} value={partner.id}>
-                    {partner.name}
-                  </option>
-                ))}
-              </select>
+              <span>ユーザーネーム</span>
+              <input
+                placeholder="例：@tanaka"
+                type="search"
+                value={billingUsernameFilter}
+                onChange={(event) => setBillingUsernameFilter(event.target.value)}
+              />
             </label>
           </section>
 
@@ -3034,19 +2713,13 @@ function App() {
             </label>
 
             <label className="field-group">
-              <span>販売パートナー</span>
-              <select
-                value={salesPartnerFilter}
-                onChange={(event) => setSalesPartnerFilter(event.target.value as PartnerFilter)}
-              >
-                <option value="すべて">すべて</option>
-                <option value="unassigned">未設定</option>
-                {sortedPartners.map((partner) => (
-                  <option key={partner.id} value={partner.id}>
-                    {partner.name}
-                  </option>
-                ))}
-              </select>
+              <span>ユーザーネーム</span>
+              <input
+                placeholder="例：@tanaka"
+                type="search"
+                value={salesUsernameFilter}
+                onChange={(event) => setSalesUsernameFilter(event.target.value)}
+              />
             </label>
           </section>
 
@@ -3086,115 +2759,6 @@ function App() {
               </section>
             </>
           )}
-        </div>
-      )
-    }
-
-    if (activeScreen === 'partners') {
-      const editingPartner = partners.find((partner) => partner.id === editingPartnerId)
-
-      return (
-        <div className="partners-layout">
-          <form className="form-card partner-form" onSubmit={handlePartnerSubmit}>
-            <h3>{editingPartnerId ? '販売パートナー編集' : '販売パートナー登録'}</h3>
-
-            {editingPartner && (
-              <div className="editing-notice">
-                <strong>販売パートナーを編集中</strong>
-                <span>{editingPartner.name} を編集中</span>
-                <p>内容を修正して、販売パートナーを更新するボタンを押してください。</p>
-              </div>
-            )}
-
-            {partnerError && <p className="form-message error">{partnerError}</p>}
-            {partnerMessage && <p className="form-message success">{partnerMessage}</p>}
-
-            <label className="field-group">
-              <span>販売パートナー名</span>
-              <input
-                placeholder="例：田中"
-                type="text"
-                value={partnerForm.name}
-                onChange={(event) => updatePartnerForm('name', event.target.value)}
-              />
-            </label>
-
-            <button className="primary-submit-button" type="submit">
-              {editingPartnerId ? '販売パートナーを更新する' : '販売パートナーを登録する'}
-            </button>
-
-            {editingPartnerId && (
-              <button className="secondary-button" type="button" onClick={handleCancelPartnerEdit}>
-                編集をキャンセル
-              </button>
-            )}
-          </form>
-
-          <section className="partner-list-section" aria-labelledby="partner-list-title">
-            <h3 id="partner-list-title">販売パートナー一覧</h3>
-            {sortedPartners.length === 0 ? (
-              <p className="empty-list-message">まだ販売パートナーは登録されていません</p>
-            ) : (
-              <div className="partner-card-list">
-                {sortedPartners.map((partner) => (
-                  <article className="partner-card" key={partner.id}>
-                    {(() => {
-                      const assignedProducts = products.filter(
-                        (product) => product.partnerId === partner.id,
-                      )
-                      const soldCount = assignedProducts.filter(hasBillingData).length
-
-                      return (
-                        <>
-                    <div className="partner-card-header">
-                      <div>
-                        <h4>{partner.name}</h4>
-                        <p>登録日：{partner.createdAt.split('T')[0]}</p>
-                      </div>
-                    </div>
-
-                    <dl className="partner-detail-list">
-                      <div>
-                        <dt>担当商品数</dt>
-                        <dd>{assignedProducts.length}件</dd>
-                      </div>
-                      <div>
-                        <dt>売却済み件数</dt>
-                        <dd>{soldCount}件</dd>
-                      </div>
-                    </dl>
-
-                    <div className="partner-actions">
-                      <button
-                        className="edit-product-button"
-                        type="button"
-                        onClick={() => handleEditPartner(partner)}
-                      >
-                        編集
-                      </button>
-                      <button
-                        className="delete-product-button"
-                        type="button"
-                        onClick={() => handleDeletePartner(partner.id)}
-                      >
-                        削除
-                      </button>
-                    </div>
-                        </>
-                      )
-                    })()}
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="partner-list-section" aria-labelledby="partner-stats-title">
-            <h3 id="partner-stats-title">販売パートナー別集計</h3>
-            <div className="partner-stats-list">
-              {partnerStats.map((stats) => renderPartnerStatsCard(stats))}
-            </div>
-          </section>
         </div>
       )
     }
