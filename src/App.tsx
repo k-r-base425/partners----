@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   calculateSalesResult,
   productTypes,
@@ -104,6 +104,18 @@ type ExpandedSections = Record<
 
 type StatusFilter = ProductStatus | 'すべて'
 type CategoryFilter = ProductCategory | 'すべて'
+type MarketplaceFilter = SalesChannelId | 'unsold' | 'すべて'
+type ProductSortOption =
+  | 'createdDesc'
+  | 'createdAsc'
+  | 'listingDateDesc'
+  | 'listingDateAsc'
+  | 'internalLowestPriceDesc'
+  | 'internalLowestPriceAsc'
+  | 'targetPriceDesc'
+  | 'targetPriceAsc'
+  | 'soldDateDesc'
+  | 'soldDateAsc'
 type BillingStatusFilter = 'すべて' | '請求待ち' | '請求済み'
 type MonthFilter = string | 'すべて'
 type RuleSectionId =
@@ -257,6 +269,25 @@ const ruleSections: {
 ]
 
 const productStatuses: ProductStatus[] = ['販売中', '売却済み', '請求待ち', '請求済み', '返却済み', '保留']
+const productStatusFilterOptions: ProductStatus[] = ['販売中', '保留', '請求待ち', '請求済み', '返却済み']
+const productMarketplaceFilterOptions: { value: MarketplaceFilter; label: string }[] = [
+  { value: 'すべて', label: 'すべて' },
+  { value: 'mercari', label: 'メルカリ' },
+  { value: 'yahoo-fleamarket', label: 'ヤフーフリマ' },
+  { value: 'unsold', label: '未売却' },
+]
+const productSortOptions: { value: ProductSortOption; label: string }[] = [
+  { value: 'createdDesc', label: '登録順：新しい順' },
+  { value: 'createdAsc', label: '登録順：古い順' },
+  { value: 'listingDateDesc', label: '出品日：新しい順' },
+  { value: 'listingDateAsc', label: '出品日：古い順' },
+  { value: 'internalLowestPriceDesc', label: '内部最低価格：高い順' },
+  { value: 'internalLowestPriceAsc', label: '内部最低価格：安い順' },
+  { value: 'targetPriceDesc', label: '売りたい価格：高い順' },
+  { value: 'targetPriceAsc', label: '売りたい価格：安い順' },
+  { value: 'soldDateDesc', label: '販売日：新しい順' },
+  { value: 'soldDateAsc', label: '販売日：古い順' },
+]
 const productStorageKey = 'partners-sales-products'
 const legacyProductStorageKey = 'offroad_partner_products'
 const legacyProductSequenceStorageKey = 'offroad_partner_product_next_number'
@@ -309,9 +340,46 @@ const getSoldMonthKey = (soldDate?: string) => {
   const match = soldDate?.match(/^(\d{4})-(\d{2})/)
   return match ? `${match[1]}-${match[2]}` : ''
 }
+const getDateTime = (dateValue?: string) => {
+  if (!dateValue) {
+    return 0
+  }
+
+  const time = new Date(dateValue).getTime()
+  return Number.isFinite(time) ? time : 0
+}
 const formatMonthLabel = (monthKey: string) => {
   const [year, month] = monthKey.split('-')
   return year && month ? `${year}年${Number(month)}月` : monthKey
+}
+const compareProductsBySortOption = (
+  first: Product,
+  second: Product,
+  sortOption: ProductSortOption,
+) => {
+  switch (sortOption) {
+    case 'createdAsc':
+      return getDateTime(first.createdAt) - getDateTime(second.createdAt)
+    case 'listingDateDesc':
+      return getDateTime(second.listingDate) - getDateTime(first.listingDate)
+    case 'listingDateAsc':
+      return getDateTime(first.listingDate) - getDateTime(second.listingDate)
+    case 'internalLowestPriceDesc':
+      return second.internalLowestPrice - first.internalLowestPrice
+    case 'internalLowestPriceAsc':
+      return first.internalLowestPrice - second.internalLowestPrice
+    case 'targetPriceDesc':
+      return second.targetPrice - first.targetPrice
+    case 'targetPriceAsc':
+      return first.targetPrice - second.targetPrice
+    case 'soldDateDesc':
+      return getDateTime(second.soldDate) - getDateTime(first.soldDate)
+    case 'soldDateAsc':
+      return getDateTime(first.soldDate) - getDateTime(second.soldDate)
+    case 'createdDesc':
+    default:
+      return getDateTime(second.createdAt) - getDateTime(first.createdAt)
+  }
 }
 const createSalesStats = (items: Product[]) => {
   const count = items.length
@@ -336,6 +404,72 @@ const createSalesStats = (items: Product[]) => {
     averageSellerProfit: count > 0 ? totalSellerProfit / count : 0,
     averageProfitRate,
   }
+}
+
+const escapeCsvValue = (value: unknown) => {
+  const text = value === undefined || value === null ? '' : String(value)
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+const createProductsCsv = (items: Product[]) => {
+  const headers = [
+    '商品番号',
+    '商品名',
+    '商品種別',
+    'ステータス',
+    '出品開始価格',
+    '売りたい価格',
+    '内部最低価格',
+    '出品日',
+    '販売日',
+    '販売先',
+    '販売価格',
+    '送料',
+    '販売手数料率',
+    '販売手数料',
+    '手数料後売価',
+    '請求額',
+    '販売者利益',
+    '利益率',
+    '請求済み日',
+    'メモ',
+  ]
+  const rows = items.map((product) => [
+    product.code,
+    product.name,
+    getCategoryLabel(product.category),
+    product.status,
+    product.startPrice,
+    product.targetPrice,
+    product.internalLowestPrice,
+    product.listingDate,
+    product.soldDate ?? '',
+    product.marketplace ? getChannelLabel(product.marketplace) : '',
+    product.soldPrice ?? '',
+    product.shippingFee ?? '',
+    product.feeRate !== undefined ? formatFeeRate(product.feeRate) : '',
+    product.platformFee ?? '',
+    product.netSales ?? '',
+    product.billingAmount ?? '',
+    product.sellerProfit ?? '',
+    product.profitRate !== undefined ? formatPercent(product.profitRate) : '',
+    product.billedDate ?? '',
+    product.memo,
+  ])
+
+  return [headers, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')
+}
+
+const downloadTextFile = (content: string, fileName: string, type: string) => {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 const createInitialProductForm = (): ProductFormState => ({
@@ -525,8 +659,11 @@ function App() {
   const [productError, setProductError] = useState('')
   const [productMessage, setProductMessage] = useState('')
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
+  const [productSearchQuery, setProductSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
+  const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>('すべて')
+  const [productSortOption, setProductSortOption] = useState<ProductSortOption>('createdDesc')
   const [activeSaleProductId, setActiveSaleProductId] = useState<string | null>(null)
   const [saleForm, setSaleForm] = useState<SaleFormState>(() => createSaleForm())
   const [saleError, setSaleError] = useState('')
@@ -540,6 +677,7 @@ function App() {
   const [openRuleSectionIds, setOpenRuleSectionIds] = useState<RuleSectionId[]>(['basic'])
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>({})
   const productFormRef = useRef<HTMLFormElement | null>(null)
+  const importFileInputRef = useRef<HTMLInputElement | null>(null)
   const shouldSkipNextProductSave = useRef(false)
 
   const feeRatePercent = clampFeeRatePercent(toNumber(feeRateInput))
@@ -567,17 +705,40 @@ function App() {
   const sortedProducts = useMemo(
     () =>
       [...products].sort(
-        (first, second) =>
-          new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime(),
+        (first, second) => compareProductsBySortOption(first, second, 'createdDesc'),
       ),
     [products],
   )
 
-  const filteredProducts = sortedProducts.filter((product) => {
-    const matchesStatus = statusFilter === 'すべて' || product.status === statusFilter
-    const matchesCategory = categoryFilter === 'すべて' || product.category === categoryFilter
-    return matchesStatus && matchesCategory
-  })
+  const filteredProducts = useMemo(() => {
+    const normalizedSearchQuery = productSearchQuery.trim().toLowerCase()
+
+    return sortedProducts
+      .filter((product) => {
+        const matchesSearch =
+          normalizedSearchQuery === '' ||
+          [product.name, product.code, product.memo].some((value) =>
+            value.toLowerCase().includes(normalizedSearchQuery),
+          )
+        const matchesStatus = statusFilter === 'すべて' || product.status === statusFilter
+        const matchesCategory = categoryFilter === 'すべて' || product.category === categoryFilter
+        const matchesMarketplace =
+          marketplaceFilter === 'すべて' ||
+          (marketplaceFilter === 'unsold'
+            ? product.soldPrice === undefined
+            : product.marketplace === marketplaceFilter)
+
+        return matchesSearch && matchesStatus && matchesCategory && matchesMarketplace
+      })
+      .sort((first, second) => compareProductsBySortOption(first, second, productSortOption))
+  }, [
+    categoryFilter,
+    marketplaceFilter,
+    productSearchQuery,
+    productSortOption,
+    sortedProducts,
+    statusFilter,
+  ])
   const editingProduct = products.find((product) => product.id === editingProductId)
   const activeSaleProduct = products.find((product) => product.id === activeSaleProductId)
   const activeSaleResult = activeSaleProduct
@@ -719,6 +880,14 @@ function App() {
         ? current.filter((id) => id !== sectionId)
         : [...current, sectionId],
     )
+  }
+
+  const handleResetProductFilters = () => {
+    setProductSearchQuery('')
+    setStatusFilter('すべて')
+    setCategoryFilter('すべて')
+    setMarketplaceFilter('すべて')
+    setProductSortOption('createdDesc')
   }
 
   const handleSalesChannelChange = (value: SalesChannelId) => {
@@ -924,6 +1093,94 @@ function App() {
     })
     setProductMessage('商品を削除しました。')
     setProductError('')
+  }
+
+  const handleExportCsv = () => {
+    const csvContent = `\uFEFF${createProductsCsv(sortedProducts)}`
+    downloadTextFile(csvContent, `partners-sales-${getTodayString()}.csv`, 'text/csv;charset=utf-8')
+    setProductMessage('CSVをエクスポートしました。')
+    setProductError('')
+  }
+
+  const handleExportJsonBackup = () => {
+    downloadTextFile(
+      JSON.stringify(products, null, 2),
+      `partners-sales-backup-${getTodayString()}.json`,
+      'application/json;charset=utf-8',
+    )
+    setProductMessage('JSONバックアップを作成しました。')
+    setProductError('')
+  }
+
+  const handleOpenImportBackup = () => {
+    importFileInputRef.current?.click()
+  }
+
+  const handleImportBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) {
+      return
+    }
+
+    if (
+      !window.confirm(
+        '現在の商品データを上書きして、バックアップデータを復元します。よろしいですか？',
+      )
+    ) {
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const parsedData: unknown = JSON.parse(text)
+
+      if (!Array.isArray(parsedData)) {
+        throw new Error('バックアップファイルの形式が正しくありません。')
+      }
+
+      const importedProducts = parsedData.map((item, index) => {
+        if (!item || typeof item !== 'object') {
+          throw new Error('商品データの形式が正しくありません。')
+        }
+
+        const source = item as Partial<Product>
+        const hasRequiredFields =
+          typeof source.id === 'string' &&
+          source.id.trim() !== '' &&
+          typeof source.code === 'string' &&
+          source.code.trim() !== '' &&
+          typeof source.name === 'string' &&
+          source.name.trim() !== ''
+
+        if (!hasRequiredFields) {
+          throw new Error('商品データとして必要な項目が不足しています。')
+        }
+
+        const normalizedProduct = normalizeProduct(item, index)
+        if (!normalizedProduct) {
+          throw new Error('商品データを読み込めませんでした。')
+        }
+
+        return normalizedProduct
+      })
+
+      localStorage.setItem(productStorageKey, JSON.stringify(importedProducts))
+      setProducts(importedProducts)
+      resetProductForm()
+      handleCancelSaleForm()
+      setExpandedSections({})
+      setProductMessage('バックアップデータを復元しました。')
+      setProductError('')
+      setSaleMessage('')
+      setBillingMessage('')
+    } catch (error) {
+      setProductMessage('')
+      setProductError(
+        error instanceof Error ? error.message : 'バックアップデータを読み込めませんでした。',
+      )
+    }
   }
 
   const handleResetSavedProducts = () => {
@@ -1382,18 +1639,29 @@ function App() {
 
             <div className="product-list-controls">
               <div className="product-counts">
-                <span>登録商品：{products.length}件</span>
-                <span>表示中：{filteredProducts.length}件</span>
+                <span>
+                  表示中：{filteredProducts.length}件 / 全{products.length}件
+                </span>
               </div>
 
               <label className="field-group">
-                <span>ステータスで絞り込み</span>
+                <span>商品検索</span>
+                <input
+                  placeholder="商品名・商品番号で検索"
+                  type="search"
+                  value={productSearchQuery}
+                  onChange={(event) => setProductSearchQuery(event.target.value)}
+                />
+              </label>
+
+              <label className="field-group">
+                <span>ステータス</span>
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
                 >
                   <option value="すべて">すべて</option>
-                  {productStatuses.map((status) => (
+                  {productStatusFilterOptions.map((status) => (
                     <option key={status} value={status}>
                       {status}
                     </option>
@@ -1402,7 +1670,7 @@ function App() {
               </label>
 
               <label className="field-group">
-                <span>商品種別で絞り込み</span>
+                <span>商品種別</span>
                 <select
                   value={categoryFilter}
                   onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)}
@@ -1415,12 +1683,48 @@ function App() {
                   ))}
                 </select>
               </label>
+
+              <label className="field-group">
+                <span>販売先</span>
+                <select
+                  value={marketplaceFilter}
+                  onChange={(event) =>
+                    setMarketplaceFilter(event.target.value as MarketplaceFilter)
+                  }
+                >
+                  {productMarketplaceFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-group">
+                <span>並び替え</span>
+                <select
+                  value={productSortOption}
+                  onChange={(event) =>
+                    setProductSortOption(event.target.value as ProductSortOption)
+                  }
+                >
+                  {productSortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button className="filter-reset-button" type="button" onClick={handleResetProductFilters}>
+                絞り込みをリセット
+              </button>
             </div>
 
             {products.length === 0 ? (
               <p className="empty-list-message">まだ登録された商品はありません</p>
             ) : filteredProducts.length === 0 ? (
-              <p className="empty-list-message">該当する商品はありません</p>
+              <p className="empty-list-message">条件に一致する商品はありません</p>
             ) : (
               <div className="product-card-list">
                 {filteredProducts.map((product) => {
@@ -1796,18 +2100,47 @@ function App() {
               </div>
             )}
 
-            <div className="product-reset-panel">
-              <div>
-                <strong>保存データ</strong>
-                <p>試験使用中の商品データをすべて削除できます。</p>
+            <div className="data-management-panel">
+              <div className="data-management-copy">
+                <strong>データ管理</strong>
+                <p>CSVは表計算ソフト確認用、JSONはアプリ復元用のバックアップです。</p>
+                <small>機種やブラウザによって、保存先や開き方が異なる場合があります。</small>
               </div>
-              <button
-                className="reset-data-button"
-                type="button"
-                onClick={handleResetSavedProducts}
-              >
-                保存データをリセット
-              </button>
+
+              <div className="data-management-actions">
+                <button className="data-action-button" type="button" onClick={handleExportCsv}>
+                  CSVエクスポート
+                </button>
+                <button
+                  className="data-action-button"
+                  type="button"
+                  onClick={handleExportJsonBackup}
+                >
+                  JSONバックアップ
+                </button>
+                <button
+                  className="data-action-button"
+                  type="button"
+                  onClick={handleOpenImportBackup}
+                >
+                  JSONインポート
+                </button>
+                <button
+                  className="data-action-button danger"
+                  type="button"
+                  onClick={handleResetSavedProducts}
+                >
+                  保存データをリセット
+                </button>
+              </div>
+
+              <input
+                ref={importFileInputRef}
+                className="hidden-file-input"
+                accept="application/json,.json"
+                type="file"
+                onChange={handleImportBackup}
+              />
             </div>
           </section>
         </div>

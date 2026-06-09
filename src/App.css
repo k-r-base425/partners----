@@ -536,7 +536,6 @@
 .product-counts {
   display: grid;
   gap: 6px;
-  grid-template-columns: 1fr 1fr;
 }
 
 .product-counts span {
@@ -549,6 +548,27 @@
   line-height: 1.4;
   padding: 10px;
   text-align: center;
+}
+
+.filter-reset-button {
+  appearance: none;
+  background: #ffffff;
+  border: 1px solid #cbd7e6;
+  border-radius: 10px;
+  color: #1f5f9f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  min-height: 44px;
+  padding: 10px 12px;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.filter-reset-button:focus-visible {
+  outline: 3px solid rgba(31, 95, 159, 0.24);
+  outline-offset: 2px;
 }
 
 .empty-list-message {
@@ -1167,18 +1187,19 @@
   margin-top: 12px;
 }
 
-.product-reset-panel {
-  background: #fffafa;
-  border: 1px solid #f3d4d4;
+.data-management-panel {
+  background: #ffffff;
+  border: 1px solid #e1e9f3;
   border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(29, 43, 64, 0.05);
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-top: 14px;
   padding: 12px;
 }
 
-.product-reset-panel strong {
-  color: #7f2d2d;
+.data-management-copy strong {
+  color: #172033;
   display: block;
   font-size: 14px;
   font-weight: 900;
@@ -1186,20 +1207,31 @@
   margin-bottom: 3px;
 }
 
-.product-reset-panel p {
-  color: #7a5660;
+.data-management-copy p,
+.data-management-copy small {
+  color: #5f7088;
+  display: block;
   font-size: 12px;
   font-weight: 800;
   line-height: 1.5;
   margin: 0;
 }
 
-.reset-data-button {
+.data-management-copy small {
+  margin-top: 4px;
+}
+
+.data-management-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.data-action-button {
   appearance: none;
-  background: #ffffff;
-  border: 1px solid #e8b9b9;
+  background: #f8fbff;
+  border: 1px solid #cfe0f3;
   border-radius: 10px;
-  color: #a3342a;
+  color: #172033;
   cursor: pointer;
   font: inherit;
   font-size: 14px;
@@ -1208,6 +1240,16 @@
   padding: 10px 12px;
   touch-action: manipulation;
   width: 100%;
+}
+
+.data-action-button.danger {
+  background: #fffafa;
+  border-color: #e8b9b9;
+  color: #a3342a;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 .billing-layout {
