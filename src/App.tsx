@@ -78,9 +78,19 @@ type ProductFormState = Omit<
   | 'startPrice'
   | 'targetPrice'
   | 'internalLowestPrice'
+  | 'soldDate'
+  | 'marketplace'
+  | 'soldPrice'
+  | 'shippingFee'
+  | 'feeRate'
+  | 'platformFee'
+  | 'netSales'
+  | 'billingAmount'
+  | 'sellerProfit'
+  | 'profitRate'
+  | 'billedDate'
 > & {
   startPrice: string
-  targetPrice: string
   internalLowestPrice: string
 }
 
@@ -112,8 +122,6 @@ type ProductSortOption =
   | 'listingDateAsc'
   | 'internalLowestPriceDesc'
   | 'internalLowestPriceAsc'
-  | 'targetPriceDesc'
-  | 'targetPriceAsc'
   | 'soldDateDesc'
   | 'soldDateAsc'
 type BillingStatusFilter = 'すべて' | '請求待ち' | '請求済み'
@@ -236,7 +244,7 @@ const ruleSections: {
       '内部最低価格を基準に5％値下げします',
       'ただし、最低値下げ額は100円です',
       'アプリでは実運用しやすいように、次回減額を50円単位で切り上げて表示します',
-      '値下げ後は、すぐに売りたい価格へ戻してください',
+      '値下げ後は、すぐに出品価格へ戻してください',
       '戻し忘れると、安い価格のまま売れてしまう可能性があります',
       '値下げ頻度は2日に1回を目安にしてください',
       '内部最低価格が300円付近まで下がった場合は、再出品を検討してください',
@@ -247,22 +255,22 @@ const ruleSections: {
       '50円単位に切り上げて、次回減額は500円',
       '次回値下げ後価格は9,000円',
     ],
-    note: '値下げ後は、必ず売りたい価格へ戻してください',
+    note: '値下げ後は、必ず出品価格へ戻してください',
   },
   {
     id: 'billing',
     title: '請求ルール',
     lead: '売却登録を行うと、アプリが自動で請求額を計算します。',
     items: [
-      '手数料後売価 = 販売価格 × 1 - 販売手数料率',
-      '基準請求額 = 手数料後売価 × 50％',
+      '入金額 = 販売価格 × 1 - 手数料率',
+      '基準請求額 = 入金額 × 50％',
       '半袖バンドTの最低請求額は3,000円',
       '長袖バンドTの最低請求額は3,800円',
       '請求ベースは、基準請求額と最低請求額の高い方を使用します',
       '追加請求額 = 仮利益 × 10％',
       '追加請求額は小数点以下を切り上げます',
       '最終請求額 = 請求ベース + 追加請求額',
-      '販売者利益 = 手数料後売価 - 最終請求額 - 送料',
+      '販売者利益 = 入金額 - 最終請求額 - 送料',
     ],
     note:
       '精算は月締めではなく、精算待ち金額が一定額に達したタイミングを目安に行います。請求・精算管理画面では、精算待ち商品と精算済み商品を分けて管理できます。',
@@ -271,7 +279,7 @@ const ruleSections: {
     id: 'shipping',
     title: '発送・送料ルール',
     items: [
-      '送料は売却登録時に入力してください',
+      '送料は販売情報登録時に入力してください',
       '初期値は215円です',
       '実際にかかった送料が違う場合は、手入力で修正してください',
       '送料が変わると、販売者利益も変わります',
@@ -282,7 +290,7 @@ const ruleSections: {
     id: 'comments',
     title: 'コメント・値下げ対応',
     items: [
-      '値下げ交渉が来た場合は、売りたい価格と内部最低価格を確認してください',
+      '値下げ交渉が来た場合は、出品価格と内部最低価格を確認してください',
       '大幅な値下げは、利益や請求額に影響するため注意してください',
       '値下げ依頼機能がある場合は、希望額を確認してから対応してください',
       '判断に迷う場合は、勝手に大幅値下げせず確認してください',
@@ -296,7 +304,7 @@ const ruleSections: {
       'アプリの計算結果は、入力内容に基づく目安です',
       '販売価格・送料・手数料率の入力ミスに注意してください',
       '値下げ後に価格を戻し忘れると、想定より安く売れる可能性があります',
-      '商品情報や売却情報は、登録後も必要に応じて編集してください',
+      '商品情報や販売情報は、登録後も必要に応じて編集してください',
       '試験運用中のため、ルールや仕様は今後変更される場合があります',
     ],
   },
@@ -317,10 +325,8 @@ const productSortOptions: { value: ProductSortOption; label: string }[] = [
   { value: 'listingDateAsc', label: '出品日：古い順' },
   { value: 'internalLowestPriceDesc', label: '内部最低価格：高い順' },
   { value: 'internalLowestPriceAsc', label: '内部最低価格：安い順' },
-  { value: 'targetPriceDesc', label: '売りたい価格：高い順' },
-  { value: 'targetPriceAsc', label: '売りたい価格：安い順' },
-  { value: 'soldDateDesc', label: '販売日：新しい順' },
-  { value: 'soldDateAsc', label: '販売日：古い順' },
+  { value: 'soldDateDesc', label: '売れた日：新しい順' },
+  { value: 'soldDateAsc', label: '売れた日：古い順' },
 ]
 const productStorageKey = 'partners-sales-products'
 const legacyProductStorageKey = 'offroad_partner_products'
@@ -428,10 +434,6 @@ const compareProductsBySortOption = (
       return second.internalLowestPrice - first.internalLowestPrice
     case 'internalLowestPriceAsc':
       return first.internalLowestPrice - second.internalLowestPrice
-    case 'targetPriceDesc':
-      return second.targetPrice - first.targetPrice
-    case 'targetPriceAsc':
-      return first.targetPrice - second.targetPrice
     case 'soldDateDesc':
       return getDateTime(second.soldDate) - getDateTime(first.soldDate)
     case 'soldDateAsc':
@@ -477,17 +479,16 @@ const createProductsCsv = (items: Product[]) => {
     '商品名',
     '商品種別',
     'ステータス',
-    '出品開始価格',
-    '売りたい価格',
+    '出品価格',
     '内部最低価格',
     '出品日',
-    '販売日',
+    '売れた日',
     '販売先',
     '販売価格',
     '送料',
-    '販売手数料率',
-    '販売手数料',
-    '手数料後売価',
+    '手数料率',
+    '手数料',
+    '入金額',
     '請求額',
     '販売者利益',
     '利益率',
@@ -500,7 +501,6 @@ const createProductsCsv = (items: Product[]) => {
     getCategoryLabel(product.category),
     getProductStatusLabel(product.status),
     product.startPrice,
-    product.targetPrice,
     product.internalLowestPrice,
     product.listingDate,
     product.soldDate ?? '',
@@ -517,7 +517,7 @@ const createProductsCsv = (items: Product[]) => {
     product.memo,
   ])
 
-    return [headers, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')
+  return [headers, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')
 }
 
 const stripIgnoredProductFields = (product: Product) => {
@@ -588,7 +588,6 @@ const createInitialProductForm = (): ProductFormState => ({
   name: '',
   category: 'shortSleeve',
   startPrice: '',
-  targetPrice: '',
   internalLowestPrice: '',
   listingDate: '',
   status: '販売中',
@@ -622,10 +621,7 @@ const getProductPriceValues = (form: ProductFormState) => {
 
   return {
     startPrice,
-    targetPrice:
-      form.targetPrice.trim() === '' && shouldUseStartPrice
-        ? startPrice
-        : toNonNegativeNumber(form.targetPrice),
+    targetPrice: startPrice,
     internalLowestPrice:
       form.internalLowestPrice.trim() === '' && shouldUseStartPrice
         ? startPrice
@@ -634,10 +630,9 @@ const getProductPriceValues = (form: ProductFormState) => {
 }
 
 const calculatePriceDropInfo = (
-  product: Pick<Product, 'internalLowestPrice' | 'targetPrice'>,
+  product: Pick<Product, 'internalLowestPrice' | 'startPrice'>,
 ): PriceDropInfo => {
   const internalLowestPrice = Math.max(0, Math.round(product.internalLowestPrice))
-  const targetPrice = Math.max(0, Math.round(product.targetPrice))
 
   if (internalLowestPrice <= 0) {
     return {
@@ -657,7 +652,7 @@ const calculatePriceDropInfo = (
     nextDiscountPrice,
     isRelistRecommended,
     operationStatus: isRelistRecommended ? '再出品推奨' : '継続運用',
-    returnPriceMessage: `割引後はすぐに${formatYen(targetPrice)}へ戻してください`,
+    returnPriceMessage: `値下げ後はすぐに出品価格へ戻してください`,
   }
 }
 
@@ -891,8 +886,8 @@ function App() {
 
   const detailRows = [
     { label: '販売価格', value: formatYen(salesResult.salePrice) },
-    { label: '販売手数料', value: formatYen(salesResult.salesFee) },
-    { label: '手数料後売価', value: formatYen(salesResult.priceAfterFee) },
+    { label: '手数料', value: formatYen(salesResult.salesFee) },
+    { label: '入金額', value: formatYen(salesResult.priceAfterFee) },
     { label: '基準請求額', value: formatYen(salesResult.baseCharge) },
     { label: '最低請求額', value: formatYen(salesResult.minimumCharge) },
     { label: '請求ベース', value: formatYen(salesResult.chargeBase) },
@@ -1346,7 +1341,6 @@ function App() {
       name: product.name,
       category: product.category,
       startPrice: product.startPrice ? String(product.startPrice) : '',
-      targetPrice: product.targetPrice ? String(product.targetPrice) : '',
       internalLowestPrice: product.internalLowestPrice ? String(product.internalLowestPrice) : '',
       listingDate: product.listingDate,
       status: product.status,
@@ -1426,7 +1420,7 @@ function App() {
     setActiveSaleProductId(null)
     setSaleForm(createSaleForm())
     setSaleError('')
-    setSaleMessage('売却登録が完了しました。商品は精算待ちに移動しました。')
+    setSaleMessage('販売情報を保存しました。この商品は精算待ちに移動しました。')
   }
 
   const handleMarkAsBilled = (productId: string) => {
@@ -1629,7 +1623,7 @@ function App() {
       </div>
 
       <div className="billing-product-meta">
-        <span>販売日：{product.soldDate || '未入力'}</span>
+        <span>売れた日：{product.soldDate || '未入力'}</span>
         {variant === 'billed' && <span>精算済み日：{product.billedDate || '未入力'}</span>}
         <span>
           販売先：
@@ -1641,6 +1635,10 @@ function App() {
         <div>
           <span>販売価格</span>
           <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+        </div>
+        <div>
+          <span>入金額</span>
+          <strong>{formatYen(product.netSales ?? 0)}</strong>
         </div>
         <div className="billing-amount-highlight">
           <span>請求額</span>
@@ -1703,7 +1701,7 @@ function App() {
     <article className="sales-result-card" key={product.id}>
       <div className="sales-result-header">
         <div>
-          <span>{product.soldDate || '販売日未入力'}</span>
+          <span>{product.soldDate || '売れた日未入力'}</span>
           <h4>{product.name}</h4>
           <p>
             {product.code || '商品番号なし'} / {getCategoryLabel(product.category)}
@@ -1725,6 +1723,10 @@ function App() {
         <div>
           <span>販売価格</span>
           <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+        </div>
+        <div>
+          <span>入金額</span>
+          <strong>{formatYen(product.netSales ?? 0)}</strong>
         </div>
         <div>
           <span>請求額</span>
@@ -1933,7 +1935,7 @@ function App() {
                   <article key={product.id}>
                     <div className="recent-sales-header">
                       <div>
-                        <span>{product.soldDate || '販売日未入力'}</span>
+                        <span>{product.soldDate || '売れた日未入力'}</span>
                         <strong>{product.name}</strong>
                       </div>
                       <em>{product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}</em>
@@ -2148,8 +2150,8 @@ function App() {
             </label>
 
             <label className="field-group">
-              <span>出品開始価格</span>
-              <small>最初に出品する価格</small>
+              <span>出品価格</span>
+              <small>販売前に設定する出品価格</small>
               <div className="input-with-unit">
                 <input
                   inputMode="numeric"
@@ -2159,23 +2161,6 @@ function App() {
                   type="number"
                   value={productForm.startPrice}
                   onChange={(event) => updateProductForm('startPrice', event.target.value)}
-                />
-                <span>円</span>
-              </div>
-            </label>
-
-            <label className="field-group">
-              <span>売りたい価格</span>
-              <small>値下げ後にこの価格へ戻します</small>
-              <div className="input-with-unit">
-                <input
-                  inputMode="numeric"
-                  min="0"
-                  pattern="[0-9]*"
-                  placeholder="例：10000"
-                  type="number"
-                  value={productForm.targetPrice}
-                  onChange={(event) => updateProductForm('targetPrice', event.target.value)}
                 />
                 <span>円</span>
               </div>
@@ -2363,7 +2348,7 @@ function App() {
                             <div className="product-meta-info">
                               <span className="product-date">
                                 {isSold
-                                  ? product.soldDate || '販売日未入力'
+                                  ? product.soldDate || '売れた日未入力'
                                   : product.listingDate || '未出品'}
                               </span>
                               <span
@@ -2402,27 +2387,27 @@ function App() {
                             {isSold ? (
                               <>
                                 <div className="metric-item">
-                                  <span>売価</span>
+                                  <span>販売価格</span>
                                   <strong>{formatYen(product.soldPrice ?? 0)}</strong>
                                 </div>
                                 <div className="metric-item">
-                                  <span>利益</span>
-                                  <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
+                                  <span>請求額</span>
+                                  <strong>{formatYen(product.billingAmount ?? 0)}</strong>
                                 </div>
                                 <div className="metric-item">
-                                  <span>利益率</span>
-                                  <strong>{formatPercent(product.profitRate ?? 0)}</strong>
+                                  <span>販売者利益</span>
+                                  <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
                                 </div>
                               </>
                             ) : (
                               <>
                                 <div className="metric-item">
-                                  <span>内部最低</span>
-                                  <strong>{formatYen(product.internalLowestPrice)}</strong>
+                                  <span>出品価格</span>
+                                  <strong>{formatYen(product.startPrice)}</strong>
                                 </div>
                                 <div className="metric-item">
-                                  <span>売りたい</span>
-                                  <strong>{formatYen(product.targetPrice)}</strong>
+                                  <span>内部最低</span>
+                                  <strong>{formatYen(product.internalLowestPrice)}</strong>
                                 </div>
                                 <div className="metric-item">
                                   <span>次回価格</span>
@@ -2470,24 +2455,24 @@ function App() {
 
                       {isDetailExpanded && (
                         <div className="product-detail-panel">
-                          <section className="detail-panel-section" aria-label="商品詳細">
-                            <h5>商品詳細</h5>
+                          <section className="detail-panel-section" aria-label="登録情報">
+                            <h5>登録情報</h5>
                             <div className="detail-grid">
                               <div className="detail-box">
                                 <span>商品番号</span>
                                 <strong>{product.code || '商品番号なし'}</strong>
                               </div>
                               <div className="detail-box">
+                                <span>商品名</span>
+                                <strong>{product.name}</strong>
+                              </div>
+                              <div className="detail-box">
                                 <span>商品種別</span>
                                 <strong>{getCategoryLabel(product.category)}</strong>
                               </div>
                               <div className="detail-box">
-                                <span>出品開始価格</span>
+                                <span>出品価格</span>
                                 <strong>{formatYen(product.startPrice)}</strong>
-                              </div>
-                              <div className="detail-box">
-                                <span>売りたい価格</span>
-                                <strong>{formatYen(product.targetPrice)}</strong>
                               </div>
                               <div className="detail-box">
                                 <span>内部最低価格</span>
@@ -2496,6 +2481,10 @@ function App() {
                               <div className="detail-box">
                                 <span>出品日</span>
                                 <strong>{product.listingDate || '未出品'}</strong>
+                              </div>
+                              <div className="detail-box">
+                                <span>ステータス</span>
+                                <strong>{getProductStatusLabel(product.status)}</strong>
                               </div>
                               <div className="detail-box full">
                                 <span>メモ</span>
@@ -2511,6 +2500,10 @@ function App() {
                             ) : (
                               <>
                                 <div className="detail-grid">
+                                  <div className="detail-box">
+                                    <span>内部最低価格</span>
+                                    <strong>{formatYen(product.internalLowestPrice)}</strong>
+                                  </div>
                                   <div className="detail-box">
                                     <span>次回減額</span>
                                     <strong>{formatYen(priceDropInfo.nextDiscountAmount)}</strong>
@@ -2544,12 +2537,14 @@ function App() {
                             )}
                           </section>
 
-                          {isSold && (
-                            <section className="detail-panel-section" aria-label="販売情報">
-                              <h5>販売情報</h5>
+                          <section className="detail-panel-section" aria-label="販売情報">
+                            <h5>販売情報</h5>
+                            {!isSold ? (
+                              <p className="empty-list-message">まだ販売情報はありません</p>
+                            ) : (
                               <div className="detail-grid">
                                 <div className="detail-box">
-                                  <span>販売日</span>
+                                  <span>売れた日</span>
                                   <strong>{product.soldDate || '未入力'}</strong>
                                 </div>
                                 <div className="detail-box">
@@ -2569,15 +2564,15 @@ function App() {
                                   <strong>{formatYen(product.shippingFee ?? 0)}</strong>
                                 </div>
                                 <div className="detail-box">
-                                  <span>販売手数料率</span>
+                                  <span>手数料率</span>
                                   <strong>{formatFeeRate(product.feeRate ?? 0)}</strong>
                                 </div>
                                 <div className="detail-box">
-                                  <span>販売手数料</span>
+                                  <span>手数料</span>
                                   <strong>{formatYen(product.platformFee ?? 0)}</strong>
                                 </div>
                                 <div className="detail-box">
-                                  <span>手数料後売価</span>
+                                  <span>入金額</span>
                                   <strong>{formatYen(product.netSales ?? 0)}</strong>
                                 </div>
                                 <div className="detail-box">
@@ -2593,8 +2588,8 @@ function App() {
                                   <strong>{formatPercent(product.profitRate ?? 0)}</strong>
                                 </div>
                               </div>
-                            </section>
-                          )}
+                            )}
+                          </section>
 
                           <section className="detail-panel-section" aria-label="操作">
                             <h5>操作</h5>
@@ -2616,7 +2611,7 @@ function App() {
                               </strong>
                               <span>
                                 {isSettled
-                                  ? '必要に応じて売却情報を確認・編集できます。'
+                                  ? '必要に応じて販売情報を確認・編集できます。'
                                   : isPendingSettlement
                                     ? '次は請求・精算管理で精算済みにします。'
                                     : '売れたら販売価格・送料を登録します。'}
@@ -2647,7 +2642,7 @@ function App() {
                                   type="button"
                                   onClick={() => handleOpenSaleForm(product)}
                                 >
-                                  売却情報を編集
+                                  販売情報を編集
                                 </button>
                               )}
                               {isSettled && (
@@ -2656,7 +2651,7 @@ function App() {
                                   type="button"
                                   onClick={() => handleOpenSaleForm(product)}
                                 >
-                                  売却情報を確認・編集
+                                  販売情報を確認・編集
                                 </button>
                               )}
                               <button
@@ -2677,17 +2672,17 @@ function App() {
                           </section>
 
                           {activeSaleProductId === product.id && activeSaleResult && (
-                            <section className="sale-form-section" aria-label="売却登録フォーム">
-                              <h5>{isSold ? '売却情報を編集' : '売却登録'}</h5>
+                            <section className="sale-form-section" aria-label="販売情報登録フォーム">
+                              <h5>{isSold ? '販売情報編集' : '販売情報登録'}</h5>
                               <p className="sale-form-description">
-                                売れた商品の販売価格・送料を登録すると、請求額と利益が自動計算されます。
+                                売れた商品の販売価格・送料を入力すると、入金額・請求額・販売者利益が自動計算されます。
                               </p>
 
                               {saleError && <p className="form-message error">{saleError}</p>}
                               {saleMessage && <p className="form-message success">{saleMessage}</p>}
 
                               <label className="field-group">
-                                <span>販売日</span>
+                                <span>売れた日</span>
                                 <input
                                   type="date"
                                   value={saleForm.soldDate}
@@ -2747,7 +2742,7 @@ function App() {
                               </label>
 
                               <label className="field-group">
-                                <span>販売手数料率（％）</span>
+                                <span>手数料率（％）</span>
                                 <div className="input-with-unit">
                                   <input
                                     inputMode="decimal"
@@ -2764,7 +2759,11 @@ function App() {
 
                               <div className="sale-result-highlight">
                                 <article>
-                                  <span>最終請求額</span>
+                                  <span>入金額</span>
+                                  <strong>{formatYen(activeSaleResult.priceAfterFee)}</strong>
+                                </article>
+                                <article>
+                                  <span>請求額</span>
                                   <strong>{formatYen(activeSaleResult.finalCharge)}</strong>
                                 </article>
                                 <article>
@@ -2775,11 +2774,11 @@ function App() {
 
                               <dl className="sale-calculation-list">
                                 <div>
-                                  <dt>販売手数料</dt>
+                                  <dt>手数料</dt>
                                   <dd>{formatYen(activeSaleResult.salesFee)}</dd>
                                 </div>
                                 <div>
-                                  <dt>手数料後売価</dt>
+                                  <dt>入金額</dt>
                                   <dd>{formatYen(activeSaleResult.priceAfterFee)}</dd>
                                 </div>
                                 <div>
@@ -2805,7 +2804,7 @@ function App() {
                                   type="button"
                                   onClick={() => handleSaleSubmit(product)}
                                 >
-                                  {isSold ? '売却情報を更新する' : '売却完了として登録'}
+                                  販売情報を保存
                                 </button>
                                 <button
                                   className="secondary-button"
