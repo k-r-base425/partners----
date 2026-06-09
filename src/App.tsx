@@ -104,6 +104,15 @@ type ExpandedSections = Record<
 
 type StatusFilter = ProductStatus | 'すべて'
 type CategoryFilter = ProductCategory | 'すべて'
+type BillingStatusFilter = 'すべて' | '請求待ち' | '請求済み'
+type MonthFilter = string | 'すべて'
+type RuleSectionId =
+  | 'basic'
+  | 'priceDrop'
+  | 'billing'
+  | 'shipping'
+  | 'comments'
+  | 'cautions'
 type LegacyProductFields = {
   suggestedPrice?: unknown
 }
@@ -122,7 +131,7 @@ const screenLabels: Record<ScreenId, string> = {
   products: '商品',
   billing: '請求管理',
   sales: '販売実績',
-  resources: 'ルール・資料',
+  resources: '販売ルール・資料',
 }
 
 const quickActions: ActionCard[] = [
@@ -151,6 +160,100 @@ const quickActions: ActionCard[] = [
 const productCategories: { value: ProductCategory; label: string }[] = [
   { value: 'shortSleeve', label: '半袖バンドT' },
   { value: 'longSleeve', label: '長袖バンドT' },
+]
+
+const ruleSections: {
+  id: RuleSectionId
+  title: string
+  lead?: string
+  items?: string[]
+  note?: string
+  example?: string[]
+}[] = [
+  {
+    id: 'basic',
+    title: '基本ルール',
+    items: [
+      '商品は販売委託形式で運用します',
+      '販売パートナーは、貸し出された商品をメルカリ・ヤフーフリマ等で販売します',
+      '商品が売れたら、販売価格・販売先・送料をアプリに登録します',
+      '売却登録後、請求額と販売者利益が自動計算されます',
+      '請求が完了した商品は、請求済みに変更します',
+      '価格変更や値下げは、内部最低価格を確認しながら行ってください',
+    ],
+  },
+  {
+    id: 'priceDrop',
+    title: 'メルカリ値下げ運用',
+    lead:
+      'メルカリの値下げ運用では、現在の表示価格ではなく、内部最低価格を基準に値下げを行います。内部最低価格とは、その商品が過去に一度でも到達した最も安い価格です。価格を元に戻しても、この最安値が次回の値下げ基準になります。',
+    items: [
+      '内部最低価格を基準に5％値下げします',
+      'ただし、最低値下げ額は100円です',
+      'アプリでは実運用しやすいように、次回減額を50円単位で切り上げて表示します',
+      '値下げ後は、すぐに売りたい価格へ戻してください',
+      '戻し忘れると、安い価格のまま売れてしまう可能性があります',
+      '値下げ頻度は2日に1回を目安にしてください',
+      '内部最低価格が300円付近まで下がった場合は、再出品を検討してください',
+    ],
+    example: [
+      '内部最低価格が9,500円の場合',
+      '5％は475円',
+      '50円単位に切り上げて、次回減額は500円',
+      '次回値下げ後価格は9,000円',
+    ],
+    note: '値下げ後は、必ず売りたい価格へ戻してください',
+  },
+  {
+    id: 'billing',
+    title: '請求ルール',
+    lead: '売却登録を行うと、アプリが自動で請求額を計算します。',
+    items: [
+      '手数料後売価 = 販売価格 × 1 - 販売手数料率',
+      '基準請求額 = 手数料後売価 × 50％',
+      '半袖バンドTの最低請求額は3,000円',
+      '長袖バンドTの最低請求額は3,800円',
+      '請求ベースは、基準請求額と最低請求額の高い方を使用します',
+      '追加請求額 = 仮利益 × 10％',
+      '追加請求額は小数点以下を切り上げます',
+      '最終請求額 = 請求ベース + 追加請求額',
+      '販売者利益 = 手数料後売価 - 最終請求額 - 送料',
+    ],
+    note: '請求画面では、請求待ち商品と請求済み商品を分けて管理できます。',
+  },
+  {
+    id: 'shipping',
+    title: '発送・送料ルール',
+    items: [
+      '送料は売却登録時に入力してください',
+      '初期値は215円です',
+      '実際にかかった送料が違う場合は、手入力で修正してください',
+      '送料が変わると、販売者利益も変わります',
+      '発送方法や送料は、販売先・商品サイズに応じて適宜確認してください',
+    ],
+  },
+  {
+    id: 'comments',
+    title: 'コメント・値下げ対応',
+    items: [
+      '値下げ交渉が来た場合は、売りたい価格と内部最低価格を確認してください',
+      '大幅な値下げは、利益や請求額に影響するため注意してください',
+      '値下げ依頼機能がある場合は、希望額を確認してから対応してください',
+      '判断に迷う場合は、勝手に大幅値下げせず確認してください',
+      'トラブルになりそうなコメントには無理に対応しなくてもOKです',
+    ],
+  },
+  {
+    id: 'cautions',
+    title: '注意事項',
+    items: [
+      'アプリの計算結果は、入力内容に基づく目安です',
+      '販売価格・送料・手数料率の入力ミスに注意してください',
+      '値下げ後に価格を戻し忘れると、想定より安く売れる可能性があります',
+      '商品情報や売却情報は、登録後も必要に応じて編集してください',
+      '試験運用中のため、ルールや仕様は今後変更される場合があります',
+    ],
+  },
 ]
 
 const productStatuses: ProductStatus[] = ['販売中', '売却済み', '請求待ち', '請求済み', '返却済み', '保留']
@@ -202,6 +305,38 @@ const hasBillingData = (product: Product) =>
   product.soldPrice !== undefined &&
   product.billingAmount !== undefined &&
   product.sellerProfit !== undefined
+const getSoldMonthKey = (soldDate?: string) => {
+  const match = soldDate?.match(/^(\d{4})-(\d{2})/)
+  return match ? `${match[1]}-${match[2]}` : ''
+}
+const formatMonthLabel = (monthKey: string) => {
+  const [year, month] = monthKey.split('-')
+  return year && month ? `${year}年${Number(month)}月` : monthKey
+}
+const createSalesStats = (items: Product[]) => {
+  const count = items.length
+  const totalSales = items.reduce((total, product) => total + (product.soldPrice ?? 0), 0)
+  const totalBilling = items.reduce((total, product) => total + (product.billingAmount ?? 0), 0)
+  const totalSellerProfit = items.reduce(
+    (total, product) => total + (product.sellerProfit ?? 0),
+    0,
+  )
+  const averageProfitRate =
+    count > 0
+      ? items.reduce((total, product) => total + (product.profitRate ?? 0), 0) / count
+      : 0
+
+  return {
+    count,
+    totalSales,
+    totalBilling,
+    totalSellerProfit,
+    averageSales: count > 0 ? totalSales / count : 0,
+    averageBilling: count > 0 ? totalBilling / count : 0,
+    averageSellerProfit: count > 0 ? totalSellerProfit / count : 0,
+    averageProfitRate,
+  }
+}
 
 const createInitialProductForm = (): ProductFormState => ({
   name: '',
@@ -398,6 +533,11 @@ function App() {
   const [saleMessage, setSaleMessage] = useState('')
   const [billingMessage, setBillingMessage] = useState('')
   const [isBilledListOpen, setIsBilledListOpen] = useState(false)
+  const [salesMonthFilter, setSalesMonthFilter] = useState<MonthFilter>('すべて')
+  const [salesChannelFilter, setSalesChannelFilter] = useState<SalesChannelId | 'すべて'>('すべて')
+  const [salesCategoryFilter, setSalesCategoryFilter] = useState<CategoryFilter>('すべて')
+  const [salesStatusFilter, setSalesStatusFilter] = useState<BillingStatusFilter>('すべて')
+  const [openRuleSectionIds, setOpenRuleSectionIds] = useState<RuleSectionId[]>(['basic'])
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>({})
   const productFormRef = useRef<HTMLFormElement | null>(null)
   const shouldSkipNextProductSave = useRef(false)
@@ -468,6 +608,39 @@ function App() {
       0,
     ),
   }
+  const soldProducts = sortedProducts
+    .filter(hasBillingData)
+    .sort((first, second) => {
+      const firstTime = first.soldDate ? new Date(first.soldDate).getTime() : 0
+      const secondTime = second.soldDate ? new Date(second.soldDate).getTime() : 0
+      return secondTime - firstTime
+    })
+  const salesMonthOptions = Array.from(
+    new Set(soldProducts.map((product) => getSoldMonthKey(product.soldDate)).filter(Boolean)),
+  ).sort((first, second) => second.localeCompare(first))
+  const filteredSalesProducts = soldProducts.filter((product) => {
+    const matchesMonth =
+      salesMonthFilter === 'すべて' || getSoldMonthKey(product.soldDate) === salesMonthFilter
+    const matchesChannel =
+      salesChannelFilter === 'すべて' || product.marketplace === salesChannelFilter
+    const matchesCategory =
+      salesCategoryFilter === 'すべて' || product.category === salesCategoryFilter
+    const matchesStatus = salesStatusFilter === 'すべて' || product.status === salesStatusFilter
+    return matchesMonth && matchesChannel && matchesCategory && matchesStatus
+  })
+  const salesSummary = createSalesStats(filteredSalesProducts)
+  const shortSleeveSalesStats = createSalesStats(
+    filteredSalesProducts.filter((product) => product.category === 'shortSleeve'),
+  )
+  const longSleeveSalesStats = createSalesStats(
+    filteredSalesProducts.filter((product) => product.category === 'longSleeve'),
+  )
+  const mercariSalesStats = createSalesStats(
+    filteredSalesProducts.filter((product) => product.marketplace === 'mercari'),
+  )
+  const yahooSalesStats = createSalesStats(
+    filteredSalesProducts.filter((product) => product.marketplace === 'yahoo-fleamarket'),
+  )
 
   const dashboardCards: DashboardCard[] = [
     { label: '登録商品数', value: String(products.length) },
@@ -538,6 +711,14 @@ function App() {
         [section]: !current[productId]?.[section],
       },
     }))
+  }
+
+  const toggleRuleSection = (sectionId: RuleSectionId) => {
+    setOpenRuleSectionIds((current) =>
+      current.includes(sectionId)
+        ? current.filter((id) => id !== sectionId)
+        : [...current, sectionId],
+    )
   }
 
   const handleSalesChannelChange = (value: SalesChannelId) => {
@@ -819,6 +1000,76 @@ function App() {
           請求待ちに戻す
         </button>
       )}
+    </article>
+  )
+
+  const renderSalesBreakdownCard = (
+    title: string,
+    stats: ReturnType<typeof createSalesStats>,
+  ) => (
+    <article className="sales-breakdown-card" key={title}>
+      <h4>{title}</h4>
+      <div className="sales-breakdown-grid">
+        <div>
+          <span>販売件数</span>
+          <strong>{stats.count}件</strong>
+        </div>
+        <div>
+          <span>総販売額</span>
+          <strong>{formatYen(stats.totalSales)}</strong>
+        </div>
+        <div>
+          <span>利益合計</span>
+          <strong>{formatYen(stats.totalSellerProfit)}</strong>
+        </div>
+        <div>
+          <span>平均単価</span>
+          <strong>{formatYen(stats.averageSales)}</strong>
+        </div>
+      </div>
+    </article>
+  )
+
+  const renderSalesResultCard = (product: Product) => (
+    <article className="sales-result-card" key={product.id}>
+      <div className="sales-result-header">
+        <div>
+          <span>{product.soldDate || '販売日未入力'}</span>
+          <h4>{product.name}</h4>
+          <p>
+            {product.code || '商品番号なし'} / {getCategoryLabel(product.category)}
+          </p>
+        </div>
+        <span className={product.status === '請求済み' ? 'sales-status billed' : 'sales-status'}>
+          {product.status}
+        </span>
+      </div>
+
+      <div className="sales-result-meta">
+        <span>
+          販売先：
+          {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
+        </span>
+      </div>
+
+      <div className="sales-result-amounts">
+        <div>
+          <span>販売価格</span>
+          <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+        </div>
+        <div>
+          <span>請求額</span>
+          <strong>{formatYen(product.billingAmount ?? 0)}</strong>
+        </div>
+        <div>
+          <span>販売者利益</span>
+          <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
+        </div>
+        <div>
+          <span>利益率</span>
+          <strong>{formatPercent(product.profitRate ?? 0)}</strong>
+        </div>
+      </div>
     </article>
   )
 
@@ -1638,26 +1889,211 @@ function App() {
       )
     }
 
-    if (activeScreen === 'resources') {
+    if (activeScreen === 'sales') {
       return (
-        <div className="feature-card-grid">
-          <article className="feature-card">
-            <p>販売ルールを表示予定です</p>
-          </article>
-          <article className="feature-card">
-            <p>PDF資料管理機能を作成予定です</p>
-          </article>
+        <div className="sales-layout">
+          <section className="sales-summary-card" aria-labelledby="sales-summary-title">
+            <h3 id="sales-summary-title">販売実績サマリー</h3>
+            <div className="sales-summary-grid">
+              <article>
+                <span>販売件数</span>
+                <strong>{salesSummary.count}件</strong>
+              </article>
+              <article>
+                <span>総販売額</span>
+                <strong>{formatYen(salesSummary.totalSales)}</strong>
+              </article>
+              <article>
+                <span>総請求額</span>
+                <strong>{formatYen(salesSummary.totalBilling)}</strong>
+              </article>
+              <article>
+                <span>利益合計</span>
+                <strong>{formatYen(salesSummary.totalSellerProfit)}</strong>
+              </article>
+              <article>
+                <span>平均販売単価</span>
+                <strong>{formatYen(salesSummary.averageSales)}</strong>
+              </article>
+              <article>
+                <span>平均請求額</span>
+                <strong>{formatYen(salesSummary.averageBilling)}</strong>
+              </article>
+              <article>
+                <span>平均販売者利益</span>
+                <strong>{formatYen(salesSummary.averageSellerProfit)}</strong>
+              </article>
+              <article>
+                <span>平均利益率</span>
+                <strong>{formatPercent(salesSummary.averageProfitRate)}</strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="sales-filter-card" aria-labelledby="sales-filter-title">
+            <h3 id="sales-filter-title">絞り込み</h3>
+            <label className="field-group">
+              <span>対象月</span>
+              <select
+                value={salesMonthFilter}
+                onChange={(event) => setSalesMonthFilter(event.target.value as MonthFilter)}
+              >
+                <option value="すべて">すべて</option>
+                {salesMonthOptions.map((monthKey) => (
+                  <option key={monthKey} value={monthKey}>
+                    {formatMonthLabel(monthKey)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-group">
+              <span>販売先</span>
+              <select
+                value={salesChannelFilter}
+                onChange={(event) =>
+                  setSalesChannelFilter(event.target.value as SalesChannelId | 'すべて')
+                }
+              >
+                <option value="すべて">すべて</option>
+                {salesChannels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-group">
+              <span>商品種別</span>
+              <select
+                value={salesCategoryFilter}
+                onChange={(event) => setSalesCategoryFilter(event.target.value as CategoryFilter)}
+              >
+                <option value="すべて">すべて</option>
+                {productCategories.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field-group">
+              <span>請求ステータス</span>
+              <select
+                value={salesStatusFilter}
+                onChange={(event) =>
+                  setSalesStatusFilter(event.target.value as BillingStatusFilter)
+                }
+              >
+                <option value="すべて">すべて</option>
+                <option value="請求待ち">請求待ち</option>
+                <option value="請求済み">請求済み</option>
+              </select>
+            </label>
+          </section>
+
+          {soldProducts.length === 0 ? (
+            <p className="empty-list-message">まだ販売実績がありません</p>
+          ) : (
+            <>
+              <section className="sales-section" aria-labelledby="category-sales-title">
+                <h3 id="category-sales-title">商品種別別集計</h3>
+                <div className="sales-breakdown-list">
+                  {renderSalesBreakdownCard('半袖バンドT', shortSleeveSalesStats)}
+                  {renderSalesBreakdownCard('長袖バンドT', longSleeveSalesStats)}
+                </div>
+              </section>
+
+              <section className="sales-section" aria-labelledby="channel-sales-title">
+                <h3 id="channel-sales-title">販売先別集計</h3>
+                <div className="sales-breakdown-list">
+                  {renderSalesBreakdownCard('メルカリ', mercariSalesStats)}
+                  {renderSalesBreakdownCard('ヤフーフリマ', yahooSalesStats)}
+                </div>
+              </section>
+
+              <section className="sales-section" aria-labelledby="sales-list-title">
+                <div className="sales-section-heading">
+                  <h3 id="sales-list-title">販売実績一覧</h3>
+                  <span>{filteredSalesProducts.length}件</span>
+                </div>
+
+                {filteredSalesProducts.length === 0 ? (
+                  <p className="empty-list-message">条件に一致する販売実績はありません</p>
+                ) : (
+                  <div className="sales-result-list">
+                    {filteredSalesProducts.map((product) => renderSalesResultCard(product))}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
         </div>
       )
     }
 
-    const placeholderText: Record<Exclude<ScreenId, 'dashboard' | 'simulation' | 'products' | 'resources' | 'billing'>, string> = {
-      sales: 'ここに販売実績を表示予定です',
+    if (activeScreen === 'resources') {
+      return (
+        <div className="rules-layout">
+          <section className="rules-intro-card" aria-labelledby="rules-title">
+            <h3 id="rules-title">販売ルール・資料</h3>
+            <p>販売運用・値下げ・請求ルールを確認できます</p>
+          </section>
+
+          <div className="rules-section-list">
+            {ruleSections.map((section) => {
+              const isOpen = openRuleSectionIds.includes(section.id)
+
+              return (
+                <article className="rules-section-card" key={section.id}>
+                  <button
+                    className="rules-toggle-button"
+                    type="button"
+                    onClick={() => toggleRuleSection(section.id)}
+                  >
+                    <span>{section.title}</span>
+                    <strong>{isOpen ? `${section.title}を閉じる` : `${section.title}を開く`}</strong>
+                  </button>
+
+                  {isOpen && (
+                    <div className="rules-section-body">
+                      {section.lead && <p className="rules-lead">{section.lead}</p>}
+
+                      {section.items && (
+                        <ul className="rules-list">
+                          {section.items.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {section.example && (
+                        <div className="rules-example-box">
+                          <strong>例</strong>
+                          <ul>
+                            {section.example.map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {section.note && <p className="rules-note">{section.note}</p>}
+                    </div>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      )
     }
 
     return (
       <div className="placeholder-panel">
-        <p>{placeholderText[activeScreen]}</p>
+        <p>ここに機能を作成予定です</p>
       </div>
     )
   }
