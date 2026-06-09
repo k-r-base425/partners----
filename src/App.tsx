@@ -156,7 +156,7 @@ const bottomNavItems: BottomNavItem[] = [
   { id: 'dashboard', label: 'ホーム', icon: '🏠' },
   { id: 'simulation', label: '計算', icon: '🧮' },
   { id: 'products', label: '商品', icon: '👕' },
-  { id: 'billing', label: '請求', icon: '💰' },
+  { id: 'billing', label: '精算', icon: '💰' },
   { id: 'sales', label: '実績', icon: '📊' },
 ]
 
@@ -275,7 +275,7 @@ const ruleSections: {
       '初期値は215円です',
       '実際にかかった送料が違う場合は、手入力で修正してください',
       '送料が変わると、販売者利益も変わります',
-      '発送方法や送料は、販売先・商品サイズに応じて適宜確認してください',
+      '発送方法や送料は、販売先・商品内容に応じて適宜確認してください',
     ],
   },
   {
@@ -370,6 +370,8 @@ const getMaterialCategoryLabel = (category: MaterialCategory) =>
   materialCategories.find((item) => item.value === category)?.label ?? category
 const getMaterialTypeLabel = (type: MaterialType) =>
   type === 'file' ? 'PDFファイル' : 'URL'
+const getProductStatusLabel = (status: ProductStatus) =>
+  status === '請求待ち' ? '精算待ち' : status === '請求済み' ? '精算済み' : status
 const formatProductCode = (sequence: number) => `BT-${String(sequence).padStart(4, '0')}`
 const getProductCodeNumber = (code: string) => {
   const match = code.match(/^BT-(\d+)$/)
@@ -496,7 +498,7 @@ const createProductsCsv = (items: Product[]) => {
     product.code,
     product.name,
     getCategoryLabel(product.category),
-    product.status,
+    getProductStatusLabel(product.status),
     product.startPrice,
     product.targetPrice,
     product.internalLowestPrice,
@@ -515,7 +517,59 @@ const createProductsCsv = (items: Product[]) => {
     product.memo,
   ])
 
-  return [headers, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')
+    return [headers, ...rows].map((row) => row.map(escapeCsvValue).join(',')).join('\n')
+}
+
+const stripIgnoredProductFields = (product: Product) => {
+  const {
+    id,
+    code,
+    name,
+    category,
+    startPrice,
+    targetPrice,
+    internalLowestPrice,
+    listingDate,
+    status,
+    memo,
+    createdAt,
+    soldDate,
+    marketplace,
+    soldPrice,
+    shippingFee,
+    feeRate,
+    platformFee,
+    netSales,
+    billingAmount,
+    sellerProfit,
+    profitRate,
+    billedDate,
+  } = product
+
+  return {
+    id,
+    code,
+    name,
+    category,
+    startPrice,
+    targetPrice,
+    internalLowestPrice,
+    listingDate,
+    status,
+    memo,
+    createdAt,
+    soldDate,
+    marketplace,
+    soldPrice,
+    shippingFee,
+    feeRate,
+    platformFee,
+    netSales,
+    billingAmount,
+    sellerProfit,
+    profitRate,
+    billedDate,
+  }
 }
 
 const downloadTextFile = (content: string, fileName: string, type: string) => {
@@ -1372,7 +1426,7 @@ function App() {
     setActiveSaleProductId(null)
     setSaleForm(createSaleForm())
     setSaleError('')
-    setSaleMessage('売却情報を登録しました。')
+    setSaleMessage('売却登録が完了しました。商品は精算待ちに移動しました。')
   }
 
   const handleMarkAsBilled = (productId: string) => {
@@ -1438,7 +1492,7 @@ function App() {
     downloadTextFile(
       JSON.stringify(
         {
-          products,
+          products: products.map(stripIgnoredProductFields),
           materials,
         },
         null,
@@ -1656,7 +1710,7 @@ function App() {
           </p>
         </div>
         <span className={product.status === '請求済み' ? 'sales-status billed' : 'sales-status'}>
-          {product.status}
+          {getProductStatusLabel(product.status)}
         </span>
       </div>
 
@@ -1740,7 +1794,28 @@ function App() {
     if (activeScreen === 'dashboard') {
       return (
         <div className="dashboard-layout">
-          <section className="dashboard-section-card" aria-labelledby="today-status-title">
+          <section className="dashboard-section-card cumulative-summary-card" aria-labelledby="cumulative-summary-title">
+            <div className="dashboard-section-heading">
+              <h3 id="cumulative-summary-title">累計サマリー</h3>
+              <span>{overallSalesStats.count}件売却</span>
+            </div>
+            <div className="cumulative-total-list">
+              <article>
+                <span>累計売上</span>
+                <strong>{formatYen(overallSalesStats.totalSales)}</strong>
+              </article>
+              <article>
+                <span>累計請求額</span>
+                <strong>{formatYen(overallSalesStats.totalBilling)}</strong>
+              </article>
+              <article>
+                <span>累計利益</span>
+                <strong>{formatYen(overallSalesStats.totalSellerProfit)}</strong>
+              </article>
+            </div>
+          </section>
+
+          <section className="dashboard-section-card today-summary-card" aria-labelledby="today-status-title">
             <div className="dashboard-section-heading">
               <h3 id="today-status-title">今日の状況</h3>
               <span>{todayString}</span>
@@ -1765,47 +1840,11 @@ function App() {
             </div>
           </section>
 
-          <section className="dashboard-section-card" aria-labelledby="overall-summary-title">
-            <div className="dashboard-section-heading">
-              <h3 id="overall-summary-title">全体サマリー</h3>
-            </div>
-            <div className="dashboard-metric-grid">
-              <article>
-                <span>登録商品数</span>
-                <strong>{products.length}件</strong>
-              </article>
-              <article>
-                <span>販売中</span>
-                <strong>{products.filter((product) => product.status === '販売中').length}件</strong>
-              </article>
-              <article>
-                <span>精算待ち</span>
-                <strong>{allPendingBillingProducts.length}件</strong>
-              </article>
-              <article>
-                <span>精算済み</span>
-                <strong>{products.filter((product) => product.status === '請求済み').length}件</strong>
-              </article>
-              <article className="dashboard-metric-wide">
-                <span>総販売額</span>
-                <strong>{formatYen(overallSalesStats.totalSales)}</strong>
-              </article>
-              <article className="dashboard-metric-wide">
-                <span>総請求額</span>
-                <strong>{formatYen(overallSalesStats.totalBilling)}</strong>
-              </article>
-              <article className="dashboard-metric-wide">
-                <span>販売者利益合計</span>
-                <strong>{formatYen(overallSalesStats.totalSellerProfit)}</strong>
-              </article>
-            </div>
-          </section>
-
           <section
             className={
               allPendingBillingProducts.length > 0
-                ? 'dashboard-section-card dashboard-alert-card'
-                : 'dashboard-section-card dashboard-muted-card'
+                ? 'dashboard-section-card settlement-alert-card dashboard-alert-card'
+                : 'dashboard-section-card settlement-alert-card dashboard-muted-card'
             }
             aria-labelledby="billing-alert-title"
           >
@@ -1855,7 +1894,7 @@ function App() {
             )}
           </section>
 
-          <section className="dashboard-section-card" aria-labelledby="price-drop-alert-title">
+          <section className="dashboard-section-card relist-alert-card" aria-labelledby="price-drop-alert-title">
             <div className="dashboard-section-heading">
               <h3 id="price-drop-alert-title">値下げ運用アラート</h3>
             </div>
@@ -1881,7 +1920,7 @@ function App() {
             )}
           </section>
 
-          <section className="dashboard-section-card" aria-labelledby="recent-sales-title">
+          <section className="dashboard-section-card recent-sales-card" aria-labelledby="recent-sales-title">
             <div className="dashboard-section-heading">
               <h3 id="recent-sales-title">最近の販売</h3>
               <span>直近5件</span>
@@ -2178,7 +2217,7 @@ function App() {
               >
                 {productStatuses.map((status) => (
                   <option key={status} value={status}>
-                    {status}
+                    {getProductStatusLabel(status)}
                   </option>
                 ))}
               </select>
@@ -2206,7 +2245,18 @@ function App() {
 
           <section className="product-list-section" aria-labelledby="product-list-title">
             <h3 id="product-list-title">登録済み商品一覧</h3>
-            {saleMessage && <p className="form-message success">{saleMessage}</p>}
+            {saleMessage && (
+              <div className="sale-complete-message">
+                <p className="form-message success">{saleMessage}</p>
+                <button
+                  className="dashboard-action-button"
+                  type="button"
+                  onClick={() => setActiveScreen('billing')}
+                >
+                  請求・精算管理を開く
+                </button>
+              </div>
+            )}
 
             <div className="product-list-controls">
               <div className="product-counts">
@@ -2234,7 +2284,7 @@ function App() {
                   <option value="すべて">すべて</option>
                   {productStatusFilterOptions.map((status) => (
                     <option key={status} value={status}>
-                      {status}
+                      {getProductStatusLabel(status)}
                     </option>
                   ))}
                 </select>
@@ -2302,6 +2352,8 @@ function App() {
                   const priceDropInfo = calculatePriceDropInfo(product)
                   const isDetailExpanded = isSectionExpanded(product.id, 'detail')
                   const isSold = product.soldPrice !== undefined
+                  const isPendingSettlement = product.status === '請求待ち'
+                  const isSettled = product.status === '請求済み'
 
                   return (
                     <article className="product-card" key={product.id}>
@@ -2314,10 +2366,24 @@ function App() {
                                   ? product.soldDate || '販売日未入力'
                                   : product.listingDate || '未出品'}
                               </span>
-                              <span className={isSold ? 'product-badge sold' : 'product-badge'}>
-                                {isSold && product.marketplace
-                                  ? getChannelLabel(product.marketplace)
-                                  : product.status}
+                              <span
+                                className={
+                                  isSettled
+                                    ? 'product-badge settled'
+                                    : isPendingSettlement
+                                      ? 'product-badge pending'
+                                      : isSold
+                                        ? 'product-badge sold'
+                                        : 'product-badge'
+                                }
+                              >
+                                {isSettled
+                                  ? '精算済み'
+                                  : isPendingSettlement
+                                    ? '精算待ち'
+                                    : isSold && product.marketplace
+                                      ? getChannelLabel(product.marketplace)
+                                      : getProductStatusLabel(product.status)}
                               </span>
                             </div>
                             <button
@@ -2371,6 +2437,36 @@ function App() {
                           </div>
                         </div>
                       </div>
+
+                      {!isDetailExpanded && (
+                        <div className="product-card-cta">
+                          {!isSold && (
+                            <>
+                              <button
+                                className="sale-product-button"
+                                type="button"
+                                onClick={() => handleOpenSaleForm(product)}
+                              >
+                                売却登録する
+                              </button>
+                              <p>売れたら販売価格・送料を登録します</p>
+                            </>
+                          )}
+                          {isPendingSettlement && (
+                            <>
+                              <button
+                                className="sale-product-button"
+                                type="button"
+                                onClick={() => setActiveScreen('billing')}
+                              >
+                                請求・精算管理を開く
+                              </button>
+                              <p>この商品は精算待ちです</p>
+                            </>
+                          )}
+                          {isSettled && <p className="settled-note">精算済みの商品です</p>}
+                        </div>
+                      )}
 
                       {isDetailExpanded && (
                         <div className="product-detail-panel">
@@ -2502,14 +2598,67 @@ function App() {
 
                           <section className="detail-panel-section" aria-label="操作">
                             <h5>操作</h5>
+                            <div
+                              className={
+                                isSettled
+                                  ? 'product-next-step settled'
+                                  : isPendingSettlement
+                                    ? 'product-next-step pending'
+                                    : 'product-next-step'
+                              }
+                            >
+                              <strong>
+                                {isSettled
+                                  ? '精算済みです'
+                                  : isPendingSettlement
+                                    ? '精算待ちです'
+                                    : '販売中です'}
+                              </strong>
+                              <span>
+                                {isSettled
+                                  ? '必要に応じて売却情報を確認・編集できます。'
+                                  : isPendingSettlement
+                                    ? '次は請求・精算管理で精算済みにします。'
+                                    : '売れたら販売価格・送料を登録します。'}
+                              </span>
+                            </div>
                             <div className="action-buttons">
-                              <button
-                                className="sale-product-button"
-                                type="button"
-                                onClick={() => handleOpenSaleForm(product)}
-                              >
-                                {isSold ? '売却情報を編集' : '販売登録'}
-                              </button>
+                              {!isSold && (
+                                <button
+                                  className="sale-product-button"
+                                  type="button"
+                                  onClick={() => handleOpenSaleForm(product)}
+                                >
+                                  売却登録する
+                                </button>
+                              )}
+                              {isPendingSettlement && (
+                                <button
+                                  className="sale-product-button"
+                                  type="button"
+                                  onClick={() => setActiveScreen('billing')}
+                                >
+                                  請求・精算管理を開く
+                                </button>
+                              )}
+                              {isSold && !isSettled && (
+                                <button
+                                  className="edit-product-button"
+                                  type="button"
+                                  onClick={() => handleOpenSaleForm(product)}
+                                >
+                                  売却情報を編集
+                                </button>
+                              )}
+                              {isSettled && (
+                                <button
+                                  className="edit-product-button"
+                                  type="button"
+                                  onClick={() => handleOpenSaleForm(product)}
+                                >
+                                  売却情報を確認・編集
+                                </button>
+                              )}
                               <button
                                 className="edit-product-button"
                                 type="button"
@@ -2530,6 +2679,9 @@ function App() {
                           {activeSaleProductId === product.id && activeSaleResult && (
                             <section className="sale-form-section" aria-label="売却登録フォーム">
                               <h5>{isSold ? '売却情報を編集' : '売却登録'}</h5>
+                              <p className="sale-form-description">
+                                売れた商品の販売価格・送料を登録すると、請求額と利益が自動計算されます。
+                              </p>
 
                               {saleError && <p className="form-message error">{saleError}</p>}
                               {saleMessage && <p className="form-message success">{saleMessage}</p>}
@@ -2645,12 +2797,15 @@ function App() {
                               </dl>
 
                               <div className="sale-form-actions">
+                                <p className="sale-form-note">
+                                  保存後、この商品は精算待ちとして管理されます。
+                                </p>
                                 <button
                                   className="primary-submit-button"
                                   type="button"
                                   onClick={() => handleSaleSubmit(product)}
                                 >
-                                  売却情報を登録する
+                                  {isSold ? '売却情報を更新する' : '売却完了として登録'}
                                 </button>
                                 <button
                                   className="secondary-button"
@@ -2900,8 +3055,8 @@ function App() {
                 }
               >
                 <option value="すべて">すべて</option>
-                <option value="請求待ち">請求待ち</option>
-                <option value="請求済み">請求済み</option>
+                <option value="請求待ち">精算待ち</option>
+                <option value="請求済み">精算済み</option>
               </select>
             </label>
 
