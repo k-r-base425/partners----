@@ -22,12 +22,6 @@ type BottomNavItem = {
   icon: string
 }
 
-type DashboardCard = {
-  label: string
-  value: string
-  variant?: 'amount'
-}
-
 type ActionCard = {
   label: string
   description: string
@@ -178,24 +172,34 @@ const screenLabels: Record<ScreenId, string> = {
 
 const quickActions: ActionCard[] = [
   {
-    label: '利益を計算する',
-    description: '販売利益シミュレーションへ',
-    target: 'simulation',
-  },
-  {
     label: '商品を登録する',
     description: '商品登録・商品一覧へ',
     target: 'products',
   },
   {
-    label: '請求を確認する',
+    label: '利益を計算する',
+    description: '販売利益シミュレーションへ',
+    target: 'simulation',
+  },
+  {
+    label: '請求管理を開く',
     description: '請求管理へ',
     target: 'billing',
+  },
+  {
+    label: '実績を見る',
+    description: '販売実績へ',
+    target: 'sales',
   },
   {
     label: 'ルール・資料を見る',
     description: '販売ルールとPDF資料の案内へ',
     target: 'resources',
+  },
+  {
+    label: 'データ管理を開く',
+    description: 'CSV・JSONバックアップへ',
+    target: 'products',
   },
 ]
 
@@ -933,6 +937,26 @@ function App() {
       const secondTime = second.soldDate ? new Date(second.soldDate).getTime() : 0
       return secondTime - firstTime
     })
+  const todayString = getTodayString()
+  const todaySalesStats = createSalesStats(
+    soldProducts.filter((product) => product.soldDate === todayString),
+  )
+  const overallSalesStats = createSalesStats(soldProducts)
+  const allPendingBillingProducts = sortedProducts.filter(
+    (product) => hasBillingData(product) && product.status === '請求待ち',
+  )
+  const pendingBillingTotal = allPendingBillingProducts.reduce(
+    (total, product) => total + (product.billingAmount ?? 0),
+    0,
+  )
+  const relistAlertProducts = sortedProducts.filter(
+    (product) =>
+      product.status === '販売中' &&
+      product.soldPrice === undefined &&
+      product.internalLowestPrice > 0 &&
+      product.internalLowestPrice <= 300,
+  )
+  const recentSalesProducts = soldProducts.slice(0, 5)
   const salesMonthOptions = Array.from(
     new Set(soldProducts.map((product) => getSoldMonthKey(product.soldDate)).filter(Boolean)),
   ).sort((first, second) => second.localeCompare(first))
@@ -980,29 +1004,6 @@ function App() {
       })
       .sort((first, second) => getDateTime(second.createdAt) - getDateTime(first.createdAt))
   }, [materialCategoryFilter, materialSearchQuery, materials])
-
-  const dashboardCards: DashboardCard[] = [
-    { label: '登録商品数', value: String(products.length) },
-    {
-      label: '販売中',
-      value: String(products.filter((product) => product.status === '販売中').length),
-    },
-    {
-      label: '売却済み',
-      value: String(products.filter((product) => product.status === '売却済み').length),
-    },
-    {
-      label: '請求待ち',
-      value: String(products.filter((product) => product.status === '請求待ち').length),
-    },
-    {
-      label: '請求済み',
-      value: String(products.filter((product) => product.status === '請求済み').length),
-    },
-    { label: '今月の販売額', value: '0円', variant: 'amount' },
-    { label: '今月の請求額', value: '0円', variant: 'amount' },
-    { label: '今月の利益', value: '0円', variant: 'amount' },
-  ]
 
   useEffect(() => {
     if (shouldSkipNextProductSave.current) {
@@ -1676,27 +1677,218 @@ function App() {
     </article>
   )
 
+  const renderDataManagementPanel = () => (
+    <div className="data-management-panel">
+      <div className="data-management-copy">
+        <strong>データ管理</strong>
+        <p>CSVは表計算ソフト確認用、JSONはアプリ復元用のバックアップです。</p>
+        <small>機種やブラウザによって、保存先や開き方が異なる場合があります。</small>
+      </div>
+
+      {productError && <p className="form-message error">{productError}</p>}
+      {productMessage && <p className="form-message success">{productMessage}</p>}
+
+      <div className="data-management-actions">
+        <button className="data-action-button" type="button" onClick={handleExportCsv}>
+          CSVエクスポート
+        </button>
+        <button
+          className="data-action-button"
+          type="button"
+          onClick={handleExportJsonBackup}
+        >
+          JSONバックアップ
+        </button>
+        <button
+          className="data-action-button"
+          type="button"
+          onClick={handleOpenImportBackup}
+        >
+          JSONインポート
+        </button>
+        <button
+          className="data-action-button danger"
+          type="button"
+          onClick={handleResetSavedProducts}
+        >
+          保存データをリセット
+        </button>
+      </div>
+
+      <input
+        ref={importFileInputRef}
+        className="hidden-file-input"
+        accept="application/json,.json"
+        type="file"
+        onChange={handleImportBackup}
+      />
+    </div>
+  )
+
   const renderContent = () => {
     if (activeScreen === 'dashboard') {
       return (
-        <>
-          <div className="dashboard-grid">
-            {dashboardCards.map((card) => (
-              <article
-                className={
-                  card.variant === 'amount'
-                    ? 'dashboard-card dashboard-card-wide'
-                    : 'dashboard-card'
-                }
-                key={card.label}
-              >
-                <p>{card.label}</p>
-                <strong>{card.value}</strong>
+        <div className="dashboard-layout">
+          <section className="dashboard-section-card" aria-labelledby="today-status-title">
+            <div className="dashboard-section-heading">
+              <h3 id="today-status-title">今日の状況</h3>
+              <span>{todayString}</span>
+            </div>
+            <div className="dashboard-metric-grid">
+              <article>
+                <span>本日の販売件数</span>
+                <strong>{todaySalesStats.count}件</strong>
               </article>
-            ))}
-          </div>
+              <article>
+                <span>本日の販売額</span>
+                <strong>{formatYen(todaySalesStats.totalSales)}</strong>
+              </article>
+              <article>
+                <span>本日の請求額</span>
+                <strong>{formatYen(todaySalesStats.totalBilling)}</strong>
+              </article>
+              <article>
+                <span>本日の販売者利益</span>
+                <strong>{formatYen(todaySalesStats.totalSellerProfit)}</strong>
+              </article>
+            </div>
+          </section>
 
-          <section className="quick-section" aria-labelledby="quick-actions-title">
+          <section className="dashboard-section-card" aria-labelledby="overall-summary-title">
+            <div className="dashboard-section-heading">
+              <h3 id="overall-summary-title">全体サマリー</h3>
+            </div>
+            <div className="dashboard-metric-grid">
+              <article>
+                <span>登録商品数</span>
+                <strong>{products.length}件</strong>
+              </article>
+              <article>
+                <span>販売中</span>
+                <strong>{products.filter((product) => product.status === '販売中').length}件</strong>
+              </article>
+              <article>
+                <span>請求待ち</span>
+                <strong>{allPendingBillingProducts.length}件</strong>
+              </article>
+              <article>
+                <span>請求済み</span>
+                <strong>{products.filter((product) => product.status === '請求済み').length}件</strong>
+              </article>
+              <article className="dashboard-metric-wide">
+                <span>総販売額</span>
+                <strong>{formatYen(overallSalesStats.totalSales)}</strong>
+              </article>
+              <article className="dashboard-metric-wide">
+                <span>総請求額</span>
+                <strong>{formatYen(overallSalesStats.totalBilling)}</strong>
+              </article>
+              <article className="dashboard-metric-wide">
+                <span>販売者利益合計</span>
+                <strong>{formatYen(overallSalesStats.totalSellerProfit)}</strong>
+              </article>
+            </div>
+          </section>
+
+          <section
+            className={
+              allPendingBillingProducts.length > 0
+                ? 'dashboard-section-card dashboard-alert-card'
+                : 'dashboard-section-card dashboard-muted-card'
+            }
+            aria-labelledby="billing-alert-title"
+          >
+            <div className="dashboard-section-heading">
+              <h3 id="billing-alert-title">請求アラート</h3>
+            </div>
+            {allPendingBillingProducts.length > 0 ? (
+              <>
+                <p className="dashboard-alert-text">
+                  請求待ちが {allPendingBillingProducts.length}件あります。
+                </p>
+                <div className="dashboard-alert-amount">
+                  <span>請求待ち合計額</span>
+                  <strong>{formatYen(pendingBillingTotal)}</strong>
+                </div>
+                <button
+                  className="dashboard-action-button"
+                  type="button"
+                  onClick={() => setActiveScreen('billing')}
+                >
+                  請求管理を開く
+                </button>
+              </>
+            ) : (
+              <p className="dashboard-muted-text">請求待ちはありません</p>
+            )}
+          </section>
+
+          <section className="dashboard-section-card" aria-labelledby="price-drop-alert-title">
+            <div className="dashboard-section-heading">
+              <h3 id="price-drop-alert-title">値下げ運用アラート</h3>
+            </div>
+            {relistAlertProducts.length > 0 ? (
+              <>
+                <p className="dashboard-alert-text">
+                  再出品検討の商品があります。対象：{relistAlertProducts.length}件
+                </p>
+                <div className="dashboard-mini-list">
+                  {relistAlertProducts.slice(0, 3).map((product) => (
+                    <article key={product.id}>
+                      <div>
+                        <strong>{product.name}</strong>
+                        <span>{product.code || '商品番号なし'}</span>
+                      </div>
+                      <em>{formatYen(product.internalLowestPrice)}</em>
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="dashboard-muted-text">再出品検討の商品はありません</p>
+            )}
+          </section>
+
+          <section className="dashboard-section-card" aria-labelledby="recent-sales-title">
+            <div className="dashboard-section-heading">
+              <h3 id="recent-sales-title">最近の販売</h3>
+              <span>直近5件</span>
+            </div>
+            {recentSalesProducts.length === 0 ? (
+              <p className="dashboard-muted-text">まだ販売実績はありません</p>
+            ) : (
+              <div className="recent-sales-list">
+                {recentSalesProducts.map((product) => (
+                  <article key={product.id}>
+                    <div className="recent-sales-header">
+                      <div>
+                        <span>{product.soldDate || '販売日未入力'}</span>
+                        <strong>{product.name}</strong>
+                        <small>ユーザー：{getUsernameLabel(product.username)}</small>
+                      </div>
+                      <em>{product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}</em>
+                    </div>
+                    <div className="recent-sales-amounts">
+                      <div>
+                        <span>販売価格</span>
+                        <strong>{formatYen(product.soldPrice ?? 0)}</strong>
+                      </div>
+                      <div>
+                        <span>請求額</span>
+                        <strong>{formatYen(product.billingAmount ?? 0)}</strong>
+                      </div>
+                      <div>
+                        <span>販売者利益</span>
+                        <strong>{formatYen(product.sellerProfit ?? 0)}</strong>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="quick-section dashboard-section-card" aria-labelledby="quick-actions-title">
             <h3 id="quick-actions-title">クイック操作</h3>
             <div className="quick-action-grid">
               {quickActions.map((action) => (
@@ -1712,7 +1904,9 @@ function App() {
               ))}
             </div>
           </section>
-        </>
+
+          {renderDataManagementPanel()}
+        </div>
       )
     }
 
@@ -2473,48 +2667,7 @@ function App() {
               </div>
             )}
 
-            <div className="data-management-panel">
-              <div className="data-management-copy">
-                <strong>データ管理</strong>
-                <p>CSVは表計算ソフト確認用、JSONはアプリ復元用のバックアップです。</p>
-                <small>機種やブラウザによって、保存先や開き方が異なる場合があります。</small>
-              </div>
-
-              <div className="data-management-actions">
-                <button className="data-action-button" type="button" onClick={handleExportCsv}>
-                  CSVエクスポート
-                </button>
-                <button
-                  className="data-action-button"
-                  type="button"
-                  onClick={handleExportJsonBackup}
-                >
-                  JSONバックアップ
-                </button>
-                <button
-                  className="data-action-button"
-                  type="button"
-                  onClick={handleOpenImportBackup}
-                >
-                  JSONインポート
-                </button>
-                <button
-                  className="data-action-button danger"
-                  type="button"
-                  onClick={handleResetSavedProducts}
-                >
-                  保存データをリセット
-                </button>
-              </div>
-
-              <input
-                ref={importFileInputRef}
-                className="hidden-file-input"
-                accept="application/json,.json"
-                type="file"
-                onChange={handleImportBackup}
-              />
-            </div>
+            {renderDataManagementPanel()}
           </section>
         </div>
       )

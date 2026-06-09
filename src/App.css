@@ -126,8 +126,231 @@
   font-size: 30px;
 }
 
+.dashboard-layout {
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dashboard-section-card {
+  background: #fbfcfe;
+  border: 1px solid #e1e9f3;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(29, 43, 64, 0.04);
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 14px;
+}
+
+.dashboard-section-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.dashboard-section-heading h3,
+.quick-section.dashboard-section-card h3 {
+  color: #172033;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.dashboard-section-heading span {
+  color: #64748b;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.dashboard-metric-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-metric-grid article,
+.dashboard-alert-amount,
+.recent-sales-amounts div {
+  background: #ffffff;
+  border: 1px solid #e5edf6;
+  border-radius: 10px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.dashboard-metric-wide {
+  grid-column: 1 / -1;
+}
+
+.dashboard-metric-grid span,
+.dashboard-alert-amount span,
+.recent-sales-amounts span {
+  color: #5f7088;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.dashboard-metric-grid strong,
+.dashboard-alert-amount strong,
+.recent-sales-amounts strong {
+  color: #172033;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-alert-card {
+  background: #fffaf0;
+  border-color: #f3d28e;
+}
+
+.dashboard-muted-card {
+  background: #f8fafc;
+}
+
+.dashboard-alert-text,
+.dashboard-muted-text {
+  color: #4b5d73;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.dashboard-alert-text {
+  color: #744c0c;
+}
+
+.dashboard-action-button {
+  appearance: none;
+  background: #1f5f9f;
+  border: 0;
+  border-radius: 10px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+  min-height: 46px;
+  padding: 12px 14px;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.dashboard-action-button:hover,
+.dashboard-action-button:focus-visible {
+  background: #174c82;
+}
+
+.dashboard-mini-list,
+.recent-sales-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-mini-list article {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5edf6;
+  border-radius: 10px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 10px;
+}
+
+.dashboard-mini-list div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dashboard-mini-list strong,
+.recent-sales-header strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.3;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-mini-list span,
+.recent-sales-header span,
+.recent-sales-header small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.dashboard-mini-list em,
+.recent-sales-header em {
+  color: #172033;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.recent-sales-list article {
+  background: #ffffff;
+  border: 1px solid #e1e9f3;
+  border-radius: 10px;
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.recent-sales-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.recent-sales-header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.recent-sales-header em {
+  background: #ecfdf5;
+  border: 1px solid #bbebd3;
+  border-radius: 999px;
+  color: #17643a;
+  padding: 4px 7px;
+}
+
+.recent-sales-amounts {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
 .quick-section {
   margin-top: 18px;
+}
+
+.quick-section.dashboard-section-card {
+  margin-top: 0;
 }
 
 .quick-section h3 {
