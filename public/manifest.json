@@ -1,0 +1,20 @@
+{
+  "name": "副業販売管理アプリ",
+  "short_name": "販売管理",
+  "description": "販売委託パートナー向けの副業販売管理アプリ",
+  "start_url": "/partners----/",
+  "scope": "/partners----/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/partners----/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

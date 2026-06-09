@@ -17,10 +17,17 @@
   box-sizing: border-box;
 }
 
+html {
+  background: #ffffff;
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   width: 100%;
 }
 

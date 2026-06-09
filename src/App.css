@@ -10,7 +10,7 @@
 .app-header {
   background: #ffffff;
   border-bottom: 1px solid #e4eaf2;
-  padding: 16px 16px 12px;
+  padding: calc(16px + env(safe-area-inset-top)) 16px 12px;
 }
 
 .app-header h1 {
@@ -30,7 +30,9 @@
 }
 
 .app-main {
-  padding: 14px 14px calc(112px + env(safe-area-inset-bottom));
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: 14px 14px calc(126px + env(safe-area-inset-bottom));
 }
 
 .content-panel {
@@ -39,6 +41,8 @@
   border-radius: 10px;
   box-shadow: 0 10px 24px rgba(29, 43, 64, 0.06);
   padding: 16px;
+  max-width: 100%;
+  overflow-x: hidden;
   width: 100%;
 }
 
@@ -68,6 +72,21 @@
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-grid,
+.products-layout,
+.simulation-layout,
+.billing-layout,
+.sales-layout,
+.rules-layout,
+.product-card,
+.billing-product-card,
+.sales-result-card,
+.rules-section-card,
+.bottom-nav {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .dashboard-card {
@@ -1766,7 +1785,7 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   left: 0;
-  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  padding: 8px 8px calc(12px + env(safe-area-inset-bottom));
   position: fixed;
   right: 0;
   width: 100%;
@@ -1786,7 +1805,7 @@
   font: inherit;
   gap: 3px;
   justify-content: center;
-  min-height: 58px;
+  min-height: 60px;
   min-width: 0;
   padding: 6px 4px;
   touch-action: manipulation;
