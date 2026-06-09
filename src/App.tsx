@@ -35,7 +35,6 @@ type Product = {
   id: string
   code: string
   name: string
-  username?: string
   category: ProductCategory
   startPrice: number
   targetPrice: number
@@ -165,7 +164,7 @@ const screenLabels: Record<ScreenId, string> = {
   dashboard: 'ホーム',
   simulation: '利益シミュレーション',
   products: '商品',
-  billing: '請求管理',
+  billing: '請求・精算管理',
   sales: '販売実績',
   resources: '販売ルール・資料',
 }
@@ -182,8 +181,8 @@ const quickActions: ActionCard[] = [
     target: 'simulation',
   },
   {
-    label: '請求管理を開く',
-    description: '請求管理へ',
+    label: '請求・精算管理を開く',
+    description: '請求・精算管理へ',
     target: 'billing',
   },
   {
@@ -224,7 +223,7 @@ const ruleSections: {
       '販売パートナーは、貸し出された商品をメルカリ・ヤフーフリマ等で販売します',
       '商品が売れたら、販売価格・販売先・送料をアプリに登録します',
       '売却登録後、請求額と販売者利益が自動計算されます',
-      '請求が完了した商品は、請求済みに変更します',
+      '精算が完了した商品は、精算済みに変更します',
       '価格変更や値下げは、内部最低価格を確認しながら行ってください',
     ],
   },
@@ -265,7 +264,8 @@ const ruleSections: {
       '最終請求額 = 請求ベース + 追加請求額',
       '販売者利益 = 手数料後売価 - 最終請求額 - 送料',
     ],
-    note: '請求画面では、請求待ち商品と請求済み商品を分けて管理できます。',
+    note:
+      '精算は月締めではなく、精算待ち金額が一定額に達したタイミングを目安に行います。請求・精算管理画面では、精算待ち商品と精算済み商品を分けて管理できます。',
   },
   {
     id: 'shipping',
@@ -326,6 +326,7 @@ const productStorageKey = 'partners-sales-products'
 const legacyProductStorageKey = 'offroad_partner_products'
 const legacyProductSequenceStorageKey = 'offroad_partner_product_next_number'
 const materialStorageKey = 'partners-sales-materials'
+const settlementThresholdStorageKey = 'partners-sales-settlement-threshold'
 const materialCategories: { value: MaterialCategory; label: string }[] = [
   { value: 'manual', label: '運用マニュアル' },
   { value: 'salesData', label: '販売データ' },
@@ -405,10 +406,6 @@ const getDateTime = (dateValue?: string) => {
   const time = new Date(dateValue).getTime()
   return Number.isFinite(time) ? time : 0
 }
-const getUsernameLabel = (username?: string) => {
-  const trimmedUsername = username?.trim()
-  return trimmedUsername ? trimmedUsername : '未設定'
-}
 const formatMonthLabel = (monthKey: string) => {
   const [year, month] = monthKey.split('-')
   return year && month ? `${year}年${Number(month)}月` : monthKey
@@ -476,7 +473,6 @@ const createProductsCsv = (items: Product[]) => {
   const headers = [
     '商品番号',
     '商品名',
-    'ユーザーネーム',
     '商品種別',
     'ステータス',
     '出品開始価格',
@@ -493,13 +489,12 @@ const createProductsCsv = (items: Product[]) => {
     '請求額',
     '販売者利益',
     '利益率',
-    '請求済み日',
+    '精算済み日',
     'メモ',
   ]
   const rows = items.map((product) => [
     product.code,
     product.name,
-    getUsernameLabel(product.username),
     getCategoryLabel(product.category),
     product.status,
     product.startPrice,
@@ -537,7 +532,6 @@ const downloadTextFile = (content: string, fileName: string, type: string) => {
 
 const createInitialProductForm = (): ProductFormState => ({
   name: '',
-  username: '',
   category: 'shortSleeve',
   startPrice: '',
   targetPrice: '',
@@ -657,7 +651,6 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
     id: typeof source.id === 'string' && source.id ? source.id : `${Date.now()}-${index}`,
     code,
     name: source.name,
-    username: typeof source.username === 'string' ? source.username : '',
     category,
     startPrice,
     targetPrice,
@@ -766,6 +759,18 @@ const loadMaterials = () => {
   }
 }
 
+const loadSettlementThreshold = () => {
+  try {
+    const storedThreshold = localStorage.getItem(settlementThresholdStorageKey)
+    const numericThreshold = Number(storedThreshold)
+    return Number.isFinite(numericThreshold) && numericThreshold > 0
+      ? String(Math.round(numericThreshold))
+      : '10000'
+  } catch {
+    return '10000'
+  }
+}
+
 const getNextProductNumber = (products: Product[]) => {
   const maxCodeNumber = products.reduce(
     (maxNumber, product) => Math.max(maxNumber, getProductCodeNumber(product.code)),
@@ -788,7 +793,6 @@ function App() {
   const [productMessage, setProductMessage] = useState('')
   const [editingProductId, setEditingProductId] = useState<string | null>(null)
   const [productSearchQuery, setProductSearchQuery] = useState('')
-  const [productUsernameFilter, setProductUsernameFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
   const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>('すべて')
@@ -799,12 +803,13 @@ function App() {
   const [saleMessage, setSaleMessage] = useState('')
   const [billingMessage, setBillingMessage] = useState('')
   const [isBilledListOpen, setIsBilledListOpen] = useState(false)
+  const [settlementThresholdInput, setSettlementThresholdInput] = useState(() =>
+    loadSettlementThreshold(),
+  )
   const [salesMonthFilter, setSalesMonthFilter] = useState<MonthFilter>('すべて')
   const [salesChannelFilter, setSalesChannelFilter] = useState<SalesChannelId | 'すべて'>('すべて')
   const [salesCategoryFilter, setSalesCategoryFilter] = useState<CategoryFilter>('すべて')
   const [salesStatusFilter, setSalesStatusFilter] = useState<BillingStatusFilter>('すべて')
-  const [salesUsernameFilter, setSalesUsernameFilter] = useState('')
-  const [billingUsernameFilter, setBillingUsernameFilter] = useState('')
   const [openRuleSectionIds, setOpenRuleSectionIds] = useState<RuleSectionId[]>(['basic'])
   const [materials, setMaterials] = useState<Material[]>(() => loadMaterials())
   const [materialForm, setMaterialForm] = useState<MaterialFormState>(() =>
@@ -853,18 +858,14 @@ function App() {
 
   const filteredProducts = useMemo(() => {
     const normalizedSearchQuery = productSearchQuery.trim().toLowerCase()
-    const normalizedUsernameFilter = productUsernameFilter.trim().toLowerCase()
 
     return sortedProducts
       .filter((product) => {
         const matchesSearch =
           normalizedSearchQuery === '' ||
-          [product.name, product.code, product.memo, product.username ?? ''].some((value) =>
+          [product.name, product.code, product.memo].some((value) =>
             value.toLowerCase().includes(normalizedSearchQuery),
           )
-        const matchesUsername =
-          normalizedUsernameFilter === '' ||
-          (product.username ?? '').toLowerCase().includes(normalizedUsernameFilter)
         const matchesStatus = statusFilter === 'すべて' || product.status === statusFilter
         const matchesCategory = categoryFilter === 'すべて' || product.category === categoryFilter
         const matchesMarketplace =
@@ -875,7 +876,6 @@ function App() {
 
         return (
           matchesSearch &&
-          matchesUsername &&
           matchesStatus &&
           matchesCategory &&
           matchesMarketplace
@@ -887,7 +887,6 @@ function App() {
     marketplaceFilter,
     productSearchQuery,
     productSortOption,
-    productUsernameFilter,
     sortedProducts,
     statusFilter,
   ])
@@ -903,13 +902,7 @@ function App() {
       })
     : null
   const billableProducts = sortedProducts.filter(hasBillingData)
-  const filteredBillableProducts = billableProducts.filter((product) => {
-    const normalizedUsernameFilter = billingUsernameFilter.trim().toLowerCase()
-    return (
-      normalizedUsernameFilter === '' ||
-      (product.username ?? '').toLowerCase().includes(normalizedUsernameFilter)
-    )
-  })
+  const filteredBillableProducts = billableProducts
   const pendingBillingProducts = filteredBillableProducts.filter(
     (product) => product.status === '請求待ち',
   )
@@ -930,6 +923,15 @@ function App() {
       0,
     ),
   }
+  const settlementThreshold = (() => {
+    const numericThreshold = Number(settlementThresholdInput)
+    return Number.isFinite(numericThreshold) && numericThreshold > 0
+      ? Math.round(numericThreshold)
+      : 10000
+  })()
+  const remainingSettlementAmount = Math.max(settlementThreshold - billingSummary.pendingTotal, 0)
+  const hasReachedSettlementThreshold =
+    billingSummary.pendingTotal >= settlementThreshold && billingSummary.pendingTotal > 0
   const soldProducts = sortedProducts
     .filter(hasBillingData)
     .sort((first, second) => {
@@ -961,7 +963,6 @@ function App() {
     new Set(soldProducts.map((product) => getSoldMonthKey(product.soldDate)).filter(Boolean)),
   ).sort((first, second) => second.localeCompare(first))
   const filteredSalesProducts = soldProducts.filter((product) => {
-    const normalizedUsernameFilter = salesUsernameFilter.trim().toLowerCase()
     const matchesMonth =
       salesMonthFilter === 'すべて' || getSoldMonthKey(product.soldDate) === salesMonthFilter
     const matchesChannel =
@@ -969,10 +970,7 @@ function App() {
     const matchesCategory =
       salesCategoryFilter === 'すべて' || product.category === salesCategoryFilter
     const matchesStatus = salesStatusFilter === 'すべて' || product.status === salesStatusFilter
-    const matchesUsername =
-      normalizedUsernameFilter === '' ||
-      (product.username ?? '').toLowerCase().includes(normalizedUsernameFilter)
-    return matchesMonth && matchesChannel && matchesCategory && matchesStatus && matchesUsername
+    return matchesMonth && matchesChannel && matchesCategory && matchesStatus
   })
   const salesSummary = createSalesStats(filteredSalesProducts)
   const shortSleeveSalesStats = createSalesStats(
@@ -1017,6 +1015,13 @@ function App() {
     localStorage.setItem(productStorageKey, JSON.stringify(products))
   }, [products])
 
+  useEffect(() => {
+    const numericThreshold = Number(settlementThresholdInput)
+    if (Number.isFinite(numericThreshold) && numericThreshold > 0) {
+      localStorage.setItem(settlementThresholdStorageKey, String(Math.round(numericThreshold)))
+    }
+  }, [settlementThresholdInput])
+
   const updateProductForm = <Key extends keyof ProductFormState>(
     key: Key,
     value: ProductFormState[Key],
@@ -1033,6 +1038,17 @@ function App() {
     setSaleForm((current) => ({ ...current, [key]: value }))
     setSaleError('')
     setSaleMessage('')
+  }
+
+  const handleSettlementThresholdBlur = () => {
+    const numericThreshold = Number(settlementThresholdInput)
+    if (!Number.isFinite(numericThreshold) || numericThreshold <= 0) {
+      setSettlementThresholdInput('10000')
+      localStorage.setItem(settlementThresholdStorageKey, '10000')
+      return
+    }
+
+    setSettlementThresholdInput(String(Math.round(numericThreshold)))
   }
 
   const updateMaterialForm = <Key extends keyof MaterialFormState>(
@@ -1088,7 +1104,6 @@ function App() {
 
   const handleResetProductFilters = () => {
     setProductSearchQuery('')
-    setProductUsernameFilter('')
     setStatusFilter('すべて')
     setCategoryFilter('すべて')
     setMarketplaceFilter('すべて')
@@ -1240,7 +1255,6 @@ function App() {
 
     const productValues = {
       name: productForm.name.trim(),
-      username: productForm.username?.trim() ?? '',
       category: productForm.category,
       ...getProductPriceValues(productForm),
       listingDate: productForm.listingDate,
@@ -1276,7 +1290,6 @@ function App() {
   const handleEditProduct = (product: Product) => {
     setProductForm({
       name: product.name,
-      username: product.username ?? '',
       category: product.category,
       startPrice: product.startPrice ? String(product.startPrice) : '',
       targetPrice: product.targetPrice ? String(product.targetPrice) : '',
@@ -1374,7 +1387,7 @@ function App() {
           : product,
       ),
     )
-    setBillingMessage('請求済みにしました。')
+    setBillingMessage('精算済みにしました。')
     setIsBilledListOpen(true)
   }
 
@@ -1390,7 +1403,7 @@ function App() {
           : product,
       ),
     )
-    setBillingMessage('請求待ちに戻しました。')
+    setBillingMessage('精算待ちに戻しました。')
   }
 
   const handleDeleteProduct = (productId: string) => {
@@ -1557,18 +1570,17 @@ function App() {
           </p>
         </div>
         <span className={variant === 'billed' ? 'billing-status billed' : 'billing-status'}>
-          {variant === 'billed' ? '請求済み' : '請求待ち'}
+          {variant === 'billed' ? '精算済み' : '精算待ち'}
         </span>
       </div>
 
       <div className="billing-product-meta">
         <span>販売日：{product.soldDate || '未入力'}</span>
-        {variant === 'billed' && <span>請求済み日：{product.billedDate || '未入力'}</span>}
+        {variant === 'billed' && <span>精算済み日：{product.billedDate || '未入力'}</span>}
         <span>
           販売先：
           {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
         </span>
-        <span>ユーザー：{getUsernameLabel(product.username)}</span>
       </div>
 
       <div className="billing-product-amounts">
@@ -1592,7 +1604,7 @@ function App() {
           type="button"
           onClick={() => handleMarkAsBilled(product.id)}
         >
-          請求済みにする
+          精算済みにする
         </button>
       ) : (
         <button
@@ -1600,7 +1612,7 @@ function App() {
           type="button"
           onClick={() => handleReturnToPendingBilling(product.id)}
         >
-          請求待ちに戻す
+          精算待ちに戻す
         </button>
       )}
     </article>
@@ -1653,7 +1665,6 @@ function App() {
           販売先：
           {product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}
         </span>
-        <span>ユーザー：{getUsernameLabel(product.username)}</span>
       </div>
 
       <div className="sales-result-amounts">
@@ -1768,11 +1779,11 @@ function App() {
                 <strong>{products.filter((product) => product.status === '販売中').length}件</strong>
               </article>
               <article>
-                <span>請求待ち</span>
+                <span>精算待ち</span>
                 <strong>{allPendingBillingProducts.length}件</strong>
               </article>
               <article>
-                <span>請求済み</span>
+                <span>精算済み</span>
                 <strong>{products.filter((product) => product.status === '請求済み').length}件</strong>
               </article>
               <article className="dashboard-metric-wide">
@@ -1799,27 +1810,48 @@ function App() {
             aria-labelledby="billing-alert-title"
           >
             <div className="dashboard-section-heading">
-              <h3 id="billing-alert-title">請求アラート</h3>
+              <h3 id="billing-alert-title">請求・精算アラート</h3>
             </div>
             {allPendingBillingProducts.length > 0 ? (
               <>
                 <p className="dashboard-alert-text">
-                  請求待ちが {allPendingBillingProducts.length}件あります。
+                  精算待ちが {allPendingBillingProducts.length}件あります。
                 </p>
-                <div className="dashboard-alert-amount">
-                  <span>請求待ち合計額</span>
-                  <strong>{formatYen(pendingBillingTotal)}</strong>
+                <div className="dashboard-settlement-grid">
+                  <div className="dashboard-alert-amount">
+                    <span>精算待ち合計額</span>
+                    <strong>{formatYen(pendingBillingTotal)}</strong>
+                  </div>
+                  <div className="dashboard-alert-amount">
+                    <span>精算基準額</span>
+                    <strong>{formatYen(settlementThreshold)}</strong>
+                  </div>
+                  <div className="dashboard-alert-amount">
+                    <span>基準額まであと</span>
+                    <strong>{formatYen(remainingSettlementAmount)}</strong>
+                  </div>
                 </div>
+                <p
+                  className={
+                    hasReachedSettlementThreshold
+                      ? 'settlement-status reached'
+                      : 'settlement-status'
+                  }
+                >
+                  {hasReachedSettlementThreshold
+                    ? '精算目安に到達しました'
+                    : 'まだ精算目安未満です'}
+                </p>
                 <button
                   className="dashboard-action-button"
                   type="button"
                   onClick={() => setActiveScreen('billing')}
                 >
-                  請求管理を開く
+                  請求・精算管理を開く
                 </button>
               </>
             ) : (
-              <p className="dashboard-muted-text">請求待ちはありません</p>
+              <p className="dashboard-muted-text">精算待ちはありません</p>
             )}
           </section>
 
@@ -1864,7 +1896,6 @@ function App() {
                       <div>
                         <span>{product.soldDate || '販売日未入力'}</span>
                         <strong>{product.name}</strong>
-                        <small>ユーザー：{getUsernameLabel(product.username)}</small>
                       </div>
                       <em>{product.marketplace ? getChannelLabel(product.marketplace) : '未入力'}</em>
                     </div>
@@ -2062,16 +2093,6 @@ function App() {
             </label>
 
             <label className="field-group">
-              <span>ユーザーネーム</span>
-              <input
-                placeholder="例：@tanaka / 田中さん / user001"
-                type="text"
-                value={productForm.username ?? ''}
-                onChange={(event) => updateProductForm('username', event.target.value)}
-              />
-            </label>
-
-            <label className="field-group">
               <span>商品種別</span>
               <select
                 value={productForm.category}
@@ -2205,16 +2226,6 @@ function App() {
               </label>
 
               <label className="field-group">
-                <span>ユーザーネームで絞り込み</span>
-                <input
-                  placeholder="例：@tanaka"
-                  type="search"
-                  value={productUsernameFilter}
-                  onChange={(event) => setProductUsernameFilter(event.target.value)}
-                />
-              </label>
-
-              <label className="field-group">
                 <span>ステータス</span>
                 <select
                   value={statusFilter}
@@ -2321,10 +2332,6 @@ function App() {
                           <h4 className="product-title">{product.name}</h4>
                           <p className="product-code">{product.code || '商品番号なし'}</p>
                           <p className="product-category-line">{getCategoryLabel(product.category)}</p>
-                          <p className="product-username-line">
-                            ユーザー：{getUsernameLabel(product.username)}
-                          </p>
-
                           <div className="product-metrics">
                             {isSold ? (
                               <>
@@ -2377,10 +2384,6 @@ function App() {
                               <div className="detail-box">
                                 <span>商品種別</span>
                                 <strong>{getCategoryLabel(product.category)}</strong>
-                              </div>
-                              <div className="detail-box">
-                                <span>ユーザーネーム</span>
-                                <strong>{getUsernameLabel(product.username)}</strong>
                               </div>
                               <div className="detail-box">
                                 <span>出品開始価格</span>
@@ -2678,23 +2681,73 @@ function App() {
         <div className="billing-layout">
           {billingMessage && <p className="form-message success">{billingMessage}</p>}
 
-          <section className="billing-summary-card" aria-labelledby="billing-summary-title">
-            <h3 id="billing-summary-title">請求サマリー</h3>
-            <div className="billing-summary-grid">
+          <section className="settlement-status-card" aria-labelledby="settlement-status-title">
+            <div className="billing-section-heading">
+              <h3 id="settlement-status-title">精算状況</h3>
+            </div>
+
+            <label className="field-group">
+              <span>精算基準額</span>
+              <small>精算待ちの請求額合計がこの金額に達したら、精算目安として表示します。</small>
+              <div className="input-with-unit">
+                <input
+                  inputMode="numeric"
+                  min="1"
+                  pattern="[0-9]*"
+                  type="number"
+                  value={settlementThresholdInput}
+                  onBlur={handleSettlementThresholdBlur}
+                  onChange={(event) => setSettlementThresholdInput(event.target.value)}
+                />
+                <span>円</span>
+              </div>
+            </label>
+
+            <div className="settlement-status-grid">
               <article>
-                <span>請求待ち件数</span>
-                <strong>{billingSummary.pendingCount}件</strong>
-              </article>
-              <article>
-                <span>請求待ち合計額</span>
+                <span>精算待ち合計額</span>
                 <strong>{formatYen(billingSummary.pendingTotal)}</strong>
               </article>
               <article>
-                <span>請求済み件数</span>
+                <span>精算基準額</span>
+                <strong>{formatYen(settlementThreshold)}</strong>
+              </article>
+              <article>
+                <span>基準額まであと</span>
+                <strong>{formatYen(remainingSettlementAmount)}</strong>
+              </article>
+            </div>
+
+            <p
+              className={
+                hasReachedSettlementThreshold
+                  ? 'settlement-status reached'
+                  : 'settlement-status'
+              }
+            >
+              {hasReachedSettlementThreshold
+                ? '精算目安に到達しました'
+                : 'まだ精算目安未満です'}
+            </p>
+          </section>
+
+          <section className="billing-summary-card" aria-labelledby="billing-summary-title">
+            <h3 id="billing-summary-title">請求・精算サマリー</h3>
+            <div className="billing-summary-grid">
+              <article>
+                <span>精算待ち件数</span>
+                <strong>{billingSummary.pendingCount}件</strong>
+              </article>
+              <article>
+                <span>精算待ち合計額</span>
+                <strong>{formatYen(billingSummary.pendingTotal)}</strong>
+              </article>
+              <article>
+                <span>精算済み件数</span>
                 <strong>{billingSummary.billedCount}件</strong>
               </article>
               <article>
-                <span>請求済み合計額</span>
+                <span>精算済み合計額</span>
                 <strong>{formatYen(billingSummary.billedTotal)}</strong>
               </article>
               <article className="billing-summary-wide">
@@ -2704,27 +2757,14 @@ function App() {
             </div>
           </section>
 
-          <section className="billing-list-section" aria-labelledby="billing-filter-title">
-            <h3 id="billing-filter-title">絞り込み</h3>
-            <label className="field-group">
-              <span>ユーザーネーム</span>
-              <input
-                placeholder="例：@tanaka"
-                type="search"
-                value={billingUsernameFilter}
-                onChange={(event) => setBillingUsernameFilter(event.target.value)}
-              />
-            </label>
-          </section>
-
           <section className="billing-list-section" aria-labelledby="pending-billing-title">
             <div className="billing-section-heading">
-              <h3 id="pending-billing-title">請求待ち一覧</h3>
+              <h3 id="pending-billing-title">精算待ち一覧</h3>
               <span>{pendingBillingProducts.length}件</span>
             </div>
 
             {pendingBillingProducts.length === 0 ? (
-              <p className="empty-list-message">請求待ちの商品はありません</p>
+              <p className="empty-list-message">精算待ちの商品はありません</p>
             ) : (
               <div className="billing-card-list">
                 {pendingBillingProducts.map((product) =>
@@ -2736,7 +2776,7 @@ function App() {
 
           <section className="billing-list-section" aria-labelledby="billed-products-title">
             <div className="billing-section-heading">
-              <h3 id="billed-products-title">請求済み一覧</h3>
+              <h3 id="billed-products-title">精算済み一覧</h3>
               <span>{billedProducts.length}件</span>
             </div>
 
@@ -2745,12 +2785,12 @@ function App() {
               type="button"
               onClick={() => setIsBilledListOpen((current) => !current)}
             >
-              {isBilledListOpen ? '請求済み一覧を閉じる' : '請求済み一覧を開く'}
+              {isBilledListOpen ? '精算済み一覧を閉じる' : '精算済み一覧を開く'}
             </button>
 
             {isBilledListOpen &&
               (billedProducts.length === 0 ? (
-                <p className="empty-list-message">請求済みの商品はありません</p>
+                <p className="empty-list-message">精算済みの商品はありません</p>
               ) : (
                 <div className="billing-card-list">
                   {billedProducts.map((product) => renderBillingProductCard(product, 'billed'))}
@@ -2865,15 +2905,6 @@ function App() {
               </select>
             </label>
 
-            <label className="field-group">
-              <span>ユーザーネーム</span>
-              <input
-                placeholder="例：@tanaka"
-                type="search"
-                value={salesUsernameFilter}
-                onChange={(event) => setSalesUsernameFilter(event.target.value)}
-              />
-            </label>
           </section>
 
           {soldProducts.length === 0 ? (
