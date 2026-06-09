@@ -20,6 +20,7 @@
 html {
   background: #ffffff;
   overflow-x: hidden;
+  overflow-y: auto;
   width: 100%;
 }
 
@@ -27,7 +28,8 @@ body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
-  overscroll-behavior-y: none;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
   width: 100%;
 }
 
@@ -39,7 +41,8 @@ select {
 }
 
 #root {
-  min-height: 100svh;
+  min-height: 100vh;
   overflow-x: hidden;
+  overflow-y: visible;
   width: 100%;
 }

@@ -1,8 +1,9 @@
 .app-shell {
   background: #f5f7fa;
   color: #172033;
-  min-height: 100svh;
+  min-height: 100vh;
   overflow-x: hidden;
+  overflow-y: visible;
   position: relative;
   width: 100%;
 }
@@ -30,8 +31,10 @@
 }
 
 .app-main {
+  min-height: 100vh;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-y: visible;
   padding: 14px 14px calc(126px + env(safe-area-inset-bottom));
 }
 
@@ -43,6 +46,7 @@
   padding: 16px;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-y: visible;
   width: 100%;
 }
 
