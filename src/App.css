@@ -1767,6 +1767,191 @@
   padding: 12px;
 }
 
+.materials-card {
+  background: #ffffff;
+  border: 1px solid #e1e9f3;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(29, 43, 64, 0.05);
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.materials-heading,
+.materials-form,
+.materials-filter-card,
+.materials-list {
+  display: grid;
+  gap: 12px;
+}
+
+.materials-heading h3,
+.materials-form h4 {
+  color: #172033;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.materials-heading p {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.materials-form {
+  border-top: 1px solid #edf2f7;
+  padding-top: 14px;
+}
+
+.materials-warning,
+.materials-help {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #8a4f0f;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+  margin: 0;
+  padding: 10px;
+}
+
+.materials-filter-card {
+  background: #fbfcfe;
+  border: 1px solid #e1e9f3;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.materials-count {
+  background: #ffffff;
+  border: 1px solid #e4eaf2;
+  border-radius: 10px;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.4;
+  padding: 10px;
+  text-align: center;
+}
+
+.material-item-card {
+  border: 1px solid #e1e9f3;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.material-item-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.material-item-header h4 {
+  color: #172033;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.4;
+  margin: 7px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.material-category-badge,
+.material-type-badge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  padding: 6px 8px;
+}
+
+.material-category-badge {
+  background: #eef5ff;
+  border: 1px solid #d7e7f7;
+  color: #1f5f9f;
+}
+
+.material-type-badge {
+  background: #ecfdf5;
+  border: 1px solid #bbebd3;
+  color: #17643a;
+  flex: 0 0 auto;
+}
+
+.material-detail-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.material-detail-list div {
+  border-top: 1px solid #edf2f7;
+  display: grid;
+  gap: 4px;
+  padding: 9px 0;
+}
+
+.material-detail-list div:first-child {
+  border-top: 0;
+}
+
+.material-detail-list dt {
+  color: #5f7088;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.material-detail-list dd {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.material-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.material-open-link,
+.material-delete-button {
+  align-items: center;
+  appearance: none;
+  background: #f8fbff;
+  border: 1px solid #cfe0f3;
+  border-radius: 10px;
+  color: #1f5f9f;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  text-decoration: none;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.material-delete-button {
+  background: #fffafa;
+  border-color: #e8b9b9;
+  color: #a3342a;
+}
+
 .sale-product-button {
   background: #1f5f9f;
   border-color: #1f5f9f;

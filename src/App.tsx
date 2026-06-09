@@ -125,6 +125,29 @@ type RuleSectionId =
   | 'shipping'
   | 'comments'
   | 'cautions'
+type MaterialCategory = 'manual' | 'salesData' | 'shipping' | 'template' | 'other'
+type MaterialType = 'link' | 'file'
+type Material = {
+  id: string
+  title: string
+  category: MaterialCategory
+  type: MaterialType
+  url: string
+  fileName?: string
+  fileData?: string
+  description: string
+  createdAt: string
+}
+type MaterialFormState = {
+  title: string
+  category: MaterialCategory
+  type: MaterialType
+  url: string
+  fileName: string
+  fileData: string
+  description: string
+}
+type MaterialCategoryFilter = MaterialCategory | 'すべて'
 type LegacyProductFields = {
   suggestedPrice?: unknown
 }
@@ -291,6 +314,25 @@ const productSortOptions: { value: ProductSortOption; label: string }[] = [
 const productStorageKey = 'partners-sales-products'
 const legacyProductStorageKey = 'offroad_partner_products'
 const legacyProductSequenceStorageKey = 'offroad_partner_product_next_number'
+const materialStorageKey = 'partners-sales-materials'
+const materialCategories: { value: MaterialCategory; label: string }[] = [
+  { value: 'manual', label: '運用マニュアル' },
+  { value: 'salesData', label: '販売データ' },
+  { value: 'shipping', label: '発送・送料' },
+  { value: 'template', label: 'テンプレート' },
+  { value: 'other', label: 'その他' },
+]
+const initialMaterials: Material[] = [
+  {
+    id: 'initial-mercari-price-drop-manual',
+    title: 'メルカリ値下げ運用マニュアル',
+    category: 'manual',
+    type: 'link',
+    url: '',
+    description: '内部最低価格を基準にした値下げ運用ルール',
+    createdAt: '2026-04-01',
+  },
+]
 
 const yenFormatter = new Intl.NumberFormat('ja-JP', {
   maximumFractionDigits: 0,
@@ -312,6 +354,10 @@ const toStoredNumber = (value: unknown, fallback = 0) => {
 const clampFeeRatePercent = (value: number) => Math.min(100, Math.max(0, value))
 const getCategoryLabel = (category: ProductCategory) =>
   productCategories.find((item) => item.value === category)?.label ?? category
+const getMaterialCategoryLabel = (category: MaterialCategory) =>
+  materialCategories.find((item) => item.value === category)?.label ?? category
+const getMaterialTypeLabel = (type: MaterialType) =>
+  type === 'file' ? 'PDFファイル' : 'URL'
 const formatProductCode = (sequence: number) => `BT-${String(sequence).padStart(4, '0')}`
 const getProductCodeNumber = (code: string) => {
   const match = code.match(/^BT-(\d+)$/)
@@ -483,6 +529,16 @@ const createInitialProductForm = (): ProductFormState => ({
   memo: '',
 })
 
+const createInitialMaterialForm = (): MaterialFormState => ({
+  title: '',
+  category: 'manual',
+  type: 'link',
+  url: '',
+  fileName: '',
+  fileData: '',
+  description: '',
+})
+
 const createSaleForm = (product?: Product): SaleFormState => ({
   soldDate: product?.soldDate || getTodayString(),
   marketplace: product?.marketplace || 'mercari',
@@ -617,6 +673,39 @@ const normalizeProduct = (value: unknown, index: number): Product | null => {
   }
 }
 
+const normalizeMaterial = (value: unknown, index: number): Material | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const source = value as Partial<Material>
+  if (!source.title || typeof source.title !== 'string') {
+    return null
+  }
+
+  const category: MaterialCategory = materialCategories.some(
+    (item) => item.value === source.category,
+  )
+    ? (source.category as MaterialCategory)
+    : 'other'
+  const type: MaterialType = source.type === 'file' ? 'file' : 'link'
+
+  return {
+    id: typeof source.id === 'string' && source.id ? source.id : `${Date.now()}-${index}`,
+    title: source.title,
+    category,
+    type,
+    url: typeof source.url === 'string' ? source.url : '',
+    fileName: typeof source.fileName === 'string' ? source.fileName : undefined,
+    fileData: typeof source.fileData === 'string' ? source.fileData : undefined,
+    description: typeof source.description === 'string' ? source.description : '',
+    createdAt:
+      typeof source.createdAt === 'string' && source.createdAt
+        ? source.createdAt
+        : new Date().toISOString(),
+  }
+}
+
 const loadProducts = () => {
   try {
     const storedProducts =
@@ -635,6 +724,26 @@ const loadProducts = () => {
       .filter((product): product is Product => Boolean(product))
   } catch {
     return []
+  }
+}
+
+const loadMaterials = () => {
+  try {
+    const storedMaterials = localStorage.getItem(materialStorageKey)
+    if (!storedMaterials) {
+      return initialMaterials
+    }
+
+    const parsedMaterials: unknown = JSON.parse(storedMaterials)
+    if (!Array.isArray(parsedMaterials)) {
+      return initialMaterials
+    }
+
+    return parsedMaterials
+      .map((material, index) => normalizeMaterial(material, index))
+      .filter((material): material is Material => Boolean(material))
+  } catch {
+    return initialMaterials
   }
 }
 
@@ -675,9 +784,19 @@ function App() {
   const [salesCategoryFilter, setSalesCategoryFilter] = useState<CategoryFilter>('すべて')
   const [salesStatusFilter, setSalesStatusFilter] = useState<BillingStatusFilter>('すべて')
   const [openRuleSectionIds, setOpenRuleSectionIds] = useState<RuleSectionId[]>(['basic'])
+  const [materials, setMaterials] = useState<Material[]>(() => loadMaterials())
+  const [materialForm, setMaterialForm] = useState<MaterialFormState>(() =>
+    createInitialMaterialForm(),
+  )
+  const [materialSearchQuery, setMaterialSearchQuery] = useState('')
+  const [materialCategoryFilter, setMaterialCategoryFilter] =
+    useState<MaterialCategoryFilter>('すべて')
+  const [materialError, setMaterialError] = useState('')
+  const [materialMessage, setMaterialMessage] = useState('')
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>({})
   const productFormRef = useRef<HTMLFormElement | null>(null)
   const importFileInputRef = useRef<HTMLInputElement | null>(null)
+  const materialFileInputRef = useRef<HTMLInputElement | null>(null)
   const shouldSkipNextProductSave = useRef(false)
 
   const feeRatePercent = clampFeeRatePercent(toNumber(feeRateInput))
@@ -802,6 +921,23 @@ function App() {
   const yahooSalesStats = createSalesStats(
     filteredSalesProducts.filter((product) => product.marketplace === 'yahoo-fleamarket'),
   )
+  const filteredMaterials = useMemo(() => {
+    const normalizedSearchQuery = materialSearchQuery.trim().toLowerCase()
+
+    return [...materials]
+      .filter((material) => {
+        const matchesSearch =
+          normalizedSearchQuery === '' ||
+          [material.title, material.description].some((value) =>
+            value.toLowerCase().includes(normalizedSearchQuery),
+          )
+        const matchesCategory =
+          materialCategoryFilter === 'すべて' || material.category === materialCategoryFilter
+
+        return matchesSearch && matchesCategory
+      })
+      .sort((first, second) => getDateTime(second.createdAt) - getDateTime(first.createdAt))
+  }, [materialCategoryFilter, materialSearchQuery, materials])
 
   const dashboardCards: DashboardCard[] = [
     { label: '登録商品数', value: String(products.length) },
@@ -856,6 +992,31 @@ function App() {
     setSaleMessage('')
   }
 
+  const updateMaterialForm = <Key extends keyof MaterialFormState>(
+    key: Key,
+    value: MaterialFormState[Key],
+  ) => {
+    setMaterialForm((current) => ({ ...current, [key]: value }))
+    setMaterialError('')
+    setMaterialMessage('')
+  }
+
+  const saveMaterials = (nextMaterials: Material[], successMessage: string) => {
+    try {
+      localStorage.setItem(materialStorageKey, JSON.stringify(nextMaterials))
+      setMaterials(nextMaterials)
+      setMaterialError('')
+      setMaterialMessage(successMessage)
+      return true
+    } catch {
+      setMaterialError(
+        '資料データを保存できませんでした。PDFが大きい場合はURL登録を使ってください。',
+      )
+      setMaterialMessage('')
+      return false
+    }
+  }
+
   const isSectionExpanded = (
     productId: string,
     section: keyof ExpandedSections[string],
@@ -888,6 +1049,118 @@ function App() {
     setCategoryFilter('すべて')
     setMarketplaceFilter('すべて')
     setProductSortOption('createdDesc')
+  }
+
+  const handleMaterialTypeChange = (type: MaterialType) => {
+    setMaterialForm((current) => ({
+      ...current,
+      type,
+      url: type === 'link' ? current.url : '',
+      fileName: type === 'file' ? current.fileName : '',
+      fileData: type === 'file' ? current.fileData : '',
+    }))
+    setMaterialError('')
+    setMaterialMessage('')
+  }
+
+  const handleMaterialFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    if (!isPdf) {
+      setMaterialError('PDFファイルを選択してください。')
+      setMaterialMessage('')
+      event.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      setMaterialForm((current) => ({
+        ...current,
+        fileName: file.name,
+        fileData: result,
+      }))
+      setMaterialError('')
+      setMaterialMessage(`${file.name} を選択しました。`)
+    }
+    reader.onerror = () => {
+      setMaterialError('PDFファイルを読み込めませんでした。')
+      setMaterialMessage('')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleMaterialSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const title = materialForm.title.trim()
+    const url = materialForm.url.trim()
+    const description = materialForm.description.trim()
+
+    if (!title) {
+      setMaterialError('資料名を入力してください。')
+      setMaterialMessage('')
+      return
+    }
+
+    if (materialForm.type === 'link') {
+      if (!url) {
+        setMaterialError('URLを入力してください。')
+        setMaterialMessage('')
+        return
+      }
+
+      if (!/^https?:\/\//i.test(url)) {
+        setMaterialError('URLは http:// または https:// から始めてください。')
+        setMaterialMessage('')
+        return
+      }
+    }
+
+    if (materialForm.type === 'file' && !materialForm.fileData) {
+      setMaterialError('PDFファイルを選択してください。')
+      setMaterialMessage('')
+      return
+    }
+
+    const newMaterial: Material = {
+      id: `${Date.now()}`,
+      title,
+      category: materialForm.category,
+      type: materialForm.type,
+      url: materialForm.type === 'link' ? url : '',
+      fileName: materialForm.type === 'file' ? materialForm.fileName : undefined,
+      fileData: materialForm.type === 'file' ? materialForm.fileData : undefined,
+      description,
+      createdAt: new Date().toISOString(),
+    }
+
+    const didSave = saveMaterials([newMaterial, ...materials], '資料を登録しました。')
+    if (!didSave) {
+      return
+    }
+
+    setMaterialForm(createInitialMaterialForm())
+    if (materialFileInputRef.current) {
+      materialFileInputRef.current.value = ''
+    }
+  }
+
+  const handleDeleteMaterial = (materialId: string) => {
+    if (!window.confirm('この資料を削除します。よろしいですか？')) {
+      return
+    }
+
+    saveMaterials(
+      materials.filter((material) => material.id !== materialId),
+      '資料を削除しました。',
+    )
   }
 
   const handleSalesChannelChange = (value: SalesChannelId) => {
@@ -2420,6 +2693,210 @@ function App() {
               )
             })}
           </div>
+
+          <section className="materials-card" aria-labelledby="materials-title">
+            <div className="materials-heading">
+              <h3 id="materials-title">資料管理</h3>
+              <p>販売データ資料・運用資料・PDF資料を登録して確認できます。</p>
+            </div>
+
+            <form className="materials-form" onSubmit={handleMaterialSubmit}>
+              <h4>資料登録</h4>
+
+              {materialError && <p className="form-message error">{materialError}</p>}
+              {materialMessage && <p className="form-message success">{materialMessage}</p>}
+
+              <label className="field-group">
+                <span>資料名</span>
+                <input
+                  placeholder="例：販売データ資料"
+                  type="text"
+                  value={materialForm.title}
+                  onChange={(event) => updateMaterialForm('title', event.target.value)}
+                />
+              </label>
+
+              <label className="field-group">
+                <span>カテゴリ</span>
+                <select
+                  value={materialForm.category}
+                  onChange={(event) =>
+                    updateMaterialForm('category', event.target.value as MaterialCategory)
+                  }
+                >
+                  {materialCategories.map((category) => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field-group">
+                <span>登録方法</span>
+                <select
+                  value={materialForm.type}
+                  onChange={(event) => handleMaterialTypeChange(event.target.value as MaterialType)}
+                >
+                  <option value="link">URLで登録</option>
+                  <option value="file">PDFファイルで登録</option>
+                </select>
+              </label>
+
+              {materialForm.type === 'link' ? (
+                <label className="field-group">
+                  <span>URL</span>
+                  <input
+                    inputMode="url"
+                    placeholder="https://example.com/manual.pdf"
+                    type="url"
+                    value={materialForm.url}
+                    onChange={(event) => updateMaterialForm('url', event.target.value)}
+                  />
+                </label>
+              ) : (
+                <label className="field-group">
+                  <span>PDFファイル</span>
+                  <input
+                    ref={materialFileInputRef}
+                    accept=".pdf,application/pdf"
+                    type="file"
+                    onChange={handleMaterialFileChange}
+                  />
+                  {materialForm.fileName && <small>選択中：{materialForm.fileName}</small>}
+                </label>
+              )}
+
+              <p className="materials-warning">
+                PDFファイルは容量が大きいと保存できない場合があります。大きな資料はURL登録を推奨します。
+              </p>
+
+              <label className="field-group">
+                <span>説明文</span>
+                <textarea
+                  placeholder="資料の内容や使う場面を入力"
+                  value={materialForm.description}
+                  onChange={(event) => updateMaterialForm('description', event.target.value)}
+                />
+              </label>
+
+              <button className="primary-submit-button" type="submit">
+                資料を登録する
+              </button>
+            </form>
+
+            <div className="materials-filter-card">
+              <label className="field-group">
+                <span>資料検索</span>
+                <input
+                  placeholder="資料名・説明文で検索"
+                  type="search"
+                  value={materialSearchQuery}
+                  onChange={(event) => setMaterialSearchQuery(event.target.value)}
+                />
+              </label>
+
+              <label className="field-group">
+                <span>カテゴリ</span>
+                <select
+                  value={materialCategoryFilter}
+                  onChange={(event) =>
+                    setMaterialCategoryFilter(event.target.value as MaterialCategoryFilter)
+                  }
+                >
+                  <option value="すべて">すべて</option>
+                  {materialCategories.map((category) => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="materials-count">
+                表示中：{filteredMaterials.length}件 / 全{materials.length}件
+              </div>
+            </div>
+
+            {materials.length === 0 ? (
+              <p className="empty-list-message">登録済み資料はありません</p>
+            ) : filteredMaterials.length === 0 ? (
+              <p className="empty-list-message">条件に一致する資料はありません</p>
+            ) : (
+              <div className="materials-list">
+                {filteredMaterials.map((material) => (
+                  <article className="material-item-card" key={material.id}>
+                    <div className="material-item-header">
+                      <div>
+                        <span className="material-category-badge">
+                          {getMaterialCategoryLabel(material.category)}
+                        </span>
+                        <h4>{material.title}</h4>
+                      </div>
+                      <span className="material-type-badge">
+                        {getMaterialTypeLabel(material.type)}
+                      </span>
+                    </div>
+
+                    <dl className="material-detail-list">
+                      <div>
+                        <dt>{material.type === 'file' ? 'ファイル名' : 'URL'}</dt>
+                        <dd>
+                          {material.type === 'file'
+                            ? material.fileName || 'ファイル名なし'
+                            : material.url || 'URL未登録'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>登録日</dt>
+                        <dd>{material.createdAt.split('T')[0]}</dd>
+                      </div>
+                      <div>
+                        <dt>説明文</dt>
+                        <dd>{material.description || '説明文なし'}</dd>
+                      </div>
+                    </dl>
+
+                    {material.type === 'file' && (
+                      <p className="materials-help">
+                        iPhoneでPDFが開けない場合は、長押しや共有から確認してください。
+                      </p>
+                    )}
+
+                    <div className="material-actions">
+                      {material.type === 'link' && material.url && (
+                        <a
+                          className="material-open-link"
+                          href={material.url}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          開く
+                        </a>
+                      )}
+                      {material.type === 'file' && material.fileData && (
+                        <a
+                          className="material-open-link"
+                          href={material.fileData}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          PDFを開く
+                        </a>
+                      )}
+                      <button
+                        className="material-delete-button"
+                        type="button"
+                        onClick={() => handleDeleteMaterial(material.id)}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )
     }
