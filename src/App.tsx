@@ -114,7 +114,6 @@ type ExpandedSections = Record<
 
 type StatusFilter = ProductStatus | 'すべて'
 type CategoryFilter = ProductCategory | 'すべて'
-type MarketplaceFilter = SalesChannelId | 'unsold' | 'すべて'
 type ProductSortOption =
   | 'createdDesc'
   | 'createdAsc'
@@ -311,13 +310,8 @@ const ruleSections: {
 ]
 
 const productStatuses: ProductStatus[] = ['販売中', '売却済み', '請求待ち', '請求済み', '返却済み', '保留']
-const productStatusFilterOptions: ProductStatus[] = ['販売中', '保留', '請求待ち', '請求済み', '返却済み']
-const productMarketplaceFilterOptions: { value: MarketplaceFilter; label: string }[] = [
-  { value: 'すべて', label: 'すべて' },
-  { value: 'mercari', label: 'メルカリ' },
-  { value: 'yahoo-fleamarket', label: 'ヤフーフリマ' },
-  { value: 'unsold', label: '未売却' },
-]
+const productVisibleStatuses: ProductStatus[] = ['販売中', '保留', '返却済み']
+const productStatusFilterOptions: ProductStatus[] = productVisibleStatuses
 const productSortOptions: { value: ProductSortOption; label: string }[] = [
   { value: 'createdDesc', label: '登録順：新しい順' },
   { value: 'createdAsc', label: '登録順：古い順' },
@@ -874,7 +868,6 @@ function App() {
   const [productSearchQuery, setProductSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('すべて')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('すべて')
-  const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>('すべて')
   const [productSortOption, setProductSortOption] = useState<ProductSortOption>('createdDesc')
   const [activeSaleProductId, setActiveSaleProductId] = useState<string | null>(null)
   const [saleForm, setSaleForm] = useState<SaleFormState>(() => createSaleForm())
@@ -935,10 +928,15 @@ function App() {
     [products],
   )
 
+  const visibleProducts = useMemo(
+    () => sortedProducts.filter((product) => productVisibleStatuses.includes(product.status)),
+    [sortedProducts],
+  )
+
   const filteredProducts = useMemo(() => {
     const normalizedSearchQuery = productSearchQuery.trim().toLowerCase()
 
-    return sortedProducts
+    return visibleProducts
       .filter((product) => {
         const matchesSearch =
           normalizedSearchQuery === '' ||
@@ -947,27 +945,20 @@ function App() {
           )
         const matchesStatus = statusFilter === 'すべて' || product.status === statusFilter
         const matchesCategory = categoryFilter === 'すべて' || product.category === categoryFilter
-        const matchesMarketplace =
-          marketplaceFilter === 'すべて' ||
-          (marketplaceFilter === 'unsold'
-            ? !isSalesCompleted(product)
-            : isSalesCompleted(product) && product.marketplace === marketplaceFilter)
 
         return (
           matchesSearch &&
           matchesStatus &&
-          matchesCategory &&
-          matchesMarketplace
+          matchesCategory
         )
       })
       .sort((first, second) => compareProductsBySortOption(first, second, productSortOption))
   }, [
     categoryFilter,
-    marketplaceFilter,
     productSearchQuery,
     productSortOption,
-    sortedProducts,
     statusFilter,
+    visibleProducts,
   ])
   const editingProduct = products.find((product) => product.id === editingProductId)
   const activeSaleProduct = products.find((product) => product.id === activeSaleProductId)
@@ -1183,7 +1174,6 @@ function App() {
     setProductSearchQuery('')
     setStatusFilter('すべて')
     setCategoryFilter('すべて')
-    setMarketplaceFilter('すべて')
     setProductSortOption('createdDesc')
   }
 
@@ -1347,7 +1337,7 @@ function App() {
 
       if (
         shouldClearSalesInfo &&
-        !window.confirm('ステータスを販売中に戻すと、登録済みの販売情報が削除されます。よろしいですか？')
+        !window.confirm('販売中に戻すと、登録済みの販売情報が削除され、商品画面に戻ります。よろしいですか？')
       ) {
         return
       }
@@ -1382,6 +1372,7 @@ function App() {
   }
 
   const handleEditProduct = (product: Product) => {
+    setActiveScreen('products')
     setProductForm({
       name: product.name,
       category: product.category,
@@ -1465,7 +1456,7 @@ function App() {
     setActiveSaleProductId(null)
     setSaleForm(createSaleForm())
     setSaleError('')
-    setSaleMessage('販売情報を保存しました。この商品は精算待ちに移動しました。')
+    setSaleMessage('販売情報を保存しました。この商品は商品一覧から実績へ移動しました。')
   }
 
   const handleMarkAsBilled = (productId: string) => {
@@ -1786,6 +1777,146 @@ function App() {
           <strong>{formatPercent(product.profitRate ?? 0)}</strong>
         </div>
       </div>
+
+      <div className="sales-result-actions">
+        <button
+          className="edit-product-button"
+          type="button"
+          onClick={() => handleOpenSaleForm(product)}
+        >
+          販売情報を編集
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => handleEditProduct(product)}
+        >
+          商品情報を編集
+        </button>
+      </div>
+
+      {activeSaleProductId === product.id && activeSaleResult && (
+        <section className="sale-form-section" aria-label="販売情報編集フォーム">
+          <h5>販売情報編集</h5>
+          <p className="sale-form-description">
+            販売価格・送料を変更すると、入金額・請求額・販売者利益が再計算されます。
+          </p>
+
+          {saleError && <p className="form-message error">{saleError}</p>}
+          {saleMessage && <p className="form-message success">{saleMessage}</p>}
+
+          <label className="field-group">
+            <span>売れた日</span>
+            <input
+              type="date"
+              value={saleForm.soldDate}
+              onChange={(event) => updateSaleForm('soldDate', event.target.value)}
+            />
+          </label>
+
+          <label className="field-group">
+            <span>販売先</span>
+            <select
+              value={saleForm.marketplace}
+              onChange={(event) =>
+                handleSaleMarketplaceChange(event.target.value as SalesChannelId)
+              }
+            >
+              {salesChannels.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field-group">
+            <span>販売価格</span>
+            <div className="input-with-unit">
+              <input
+                inputMode="numeric"
+                min="0"
+                pattern="[0-9]*"
+                placeholder="例：10000"
+                type="number"
+                value={saleForm.soldPrice}
+                onChange={(event) => updateSaleForm('soldPrice', event.target.value)}
+              />
+              <span>円</span>
+            </div>
+          </label>
+
+          <label className="field-group">
+            <span>送料</span>
+            <div className="input-with-unit">
+              <input
+                inputMode="numeric"
+                min="0"
+                pattern="[0-9]*"
+                type="number"
+                value={saleForm.shippingFee}
+                onChange={(event) => updateSaleForm('shippingFee', event.target.value)}
+              />
+              <span>円</span>
+            </div>
+          </label>
+
+          <label className="field-group">
+            <span>手数料率（％）</span>
+            <div className="input-with-unit">
+              <input
+                inputMode="decimal"
+                max="100"
+                min="0"
+                step="0.1"
+                type="number"
+                value={saleForm.feeRate}
+                onChange={(event) => updateSaleForm('feeRate', event.target.value)}
+              />
+              <span>%</span>
+            </div>
+          </label>
+
+          <div className="sale-result-highlight">
+            <article>
+              <span>入金額</span>
+              <strong>{formatYen(activeSaleResult.priceAfterFee)}</strong>
+            </article>
+            <article>
+              <span>請求額</span>
+              <strong>{formatYen(activeSaleResult.finalCharge)}</strong>
+            </article>
+            <article>
+              <span>販売者利益</span>
+              <strong>{formatYen(activeSaleResult.sellerProfit)}</strong>
+            </article>
+          </div>
+
+          <dl className="sale-calculation-list">
+            <div>
+              <dt>手数料</dt>
+              <dd>{formatYen(activeSaleResult.salesFee)}</dd>
+            </div>
+            <div>
+              <dt>利益率</dt>
+              <dd>{formatPercent(activeSaleResult.profitRate)}</dd>
+            </div>
+          </dl>
+
+          <div className="sale-form-actions">
+            <button
+              className="primary-submit-button"
+              type="button"
+              onClick={() => handleSaleSubmit(product)}
+            >
+              販売情報を保存
+            </button>
+            <button className="secondary-button" type="button" onClick={handleCancelSaleForm}>
+              キャンセル
+            </button>
+          </div>
+        </section>
+      )}
     </article>
   )
 
@@ -2156,6 +2287,9 @@ function App() {
         <div className="products-layout">
           <form className="form-card product-form" ref={productFormRef} onSubmit={handleProductSubmit}>
             <h3>{editingProductId ? '商品編集' : '商品登録'}</h3>
+            <p className="screen-description">
+              販売中の商品を登録・管理します。売却登録した商品は実績画面に移動します。
+            </p>
 
             {editingProduct && (
               <div className="editing-notice">
@@ -2274,10 +2408,17 @@ function App() {
           </form>
 
           <section className="product-list-section" aria-labelledby="product-list-title">
-            <h3 id="product-list-title">登録済み商品一覧</h3>
+            <h3 id="product-list-title">販売中の商品一覧</h3>
             {saleMessage && (
               <div className="sale-complete-message">
                 <p className="form-message success">{saleMessage}</p>
+                <button
+                  className="dashboard-action-button"
+                  type="button"
+                  onClick={() => setActiveScreen('sales')}
+                >
+                  実績を見る
+                </button>
                 <button
                   className="dashboard-action-button"
                   type="button"
@@ -2291,7 +2432,7 @@ function App() {
             <div className="product-list-controls">
               <div className="product-counts">
                 <span>
-                  表示中：{filteredProducts.length}件 / 全{products.length}件
+                  表示中：{filteredProducts.length}件 / 販売中対象{visibleProducts.length}件
                 </span>
               </div>
 
@@ -2336,22 +2477,6 @@ function App() {
               </label>
 
               <label className="field-group">
-                <span>販売先</span>
-                <select
-                  value={marketplaceFilter}
-                  onChange={(event) =>
-                    setMarketplaceFilter(event.target.value as MarketplaceFilter)
-                  }
-                >
-                  {productMarketplaceFilterOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="field-group">
                 <span>並び替え</span>
                 <select
                   value={productSortOption}
@@ -2372,8 +2497,11 @@ function App() {
               </button>
             </div>
 
-            {products.length === 0 ? (
-              <p className="empty-list-message">まだ登録された商品はありません</p>
+            {visibleProducts.length === 0 ? (
+              <div className="empty-list-message">
+                <p>販売中の商品はありません</p>
+                <small>商品を登録すると、ここに表示されます。売却登録後の商品は実績画面で確認できます。</small>
+              </div>
             ) : filteredProducts.length === 0 ? (
               <p className="empty-list-message">条件に一致する商品はありません</p>
             ) : (

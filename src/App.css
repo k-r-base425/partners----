@@ -1965,6 +1965,18 @@
   grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
 }
 
+.sales-result-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.sales-result-actions .secondary-button,
+.sales-result-actions .edit-product-button {
+  min-height: 44px;
+  width: 100%;
+}
+
 .sales-breakdown-grid div,
 .sales-result-amounts div {
   background: #ffffff;
